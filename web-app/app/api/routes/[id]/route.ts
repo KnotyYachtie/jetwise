@@ -1,13 +1,13 @@
 import { sql } from "@vercel/postgres";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 // GET single route with assignments
 export async function GET(
-  req: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id;
+    const { id } = await context.params;
 
     const routeRes = await sql`SELECT * FROM routes WHERE id = ${id}`;
     if (routeRes.rows.length === 0) {
@@ -45,11 +45,11 @@ export async function GET(
 
 // PUT update route fields
 export async function PUT(
-  req: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id;
+    const { id } = await context.params;
     const body = await req.json();
 
     const {
@@ -90,11 +90,11 @@ export async function PUT(
 
 // DELETE route + its assignments
 export async function DELETE(
-  req: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id;
+    const { id } = await context.params;
 
     // delete assignments first (if no ON DELETE CASCADE)
     await sql`DELETE FROM route_assignments WHERE route_id = ${id}`;
