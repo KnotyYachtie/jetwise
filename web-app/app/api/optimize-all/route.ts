@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     };
 
     const routes = routesInput.map((r: any) => {
-      const plan = optimize(
+      const result = optimize(
         r.distance,
         {
           y: r.demand?.y ?? r.demand_y ?? 0,
@@ -53,11 +53,9 @@ export async function POST(req: Request) {
         destination: r.destination,
         distance: r.distance,
         optimized: {
-          total_profit_per_day: plan.reduce(
-            (sum: number, x: any) => sum + x.daily_profit,
-            0
-          ),
-          plan,
+          total_profit_per_week: result.total_profit_per_week,
+          plan: result.plan,
+          marginal_values: result.marginal_values,
         },
       };
     });

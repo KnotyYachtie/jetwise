@@ -8,6 +8,12 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [manualRoutes, setManualRoutes] = useState<any[]>([]);
   const [fleet, setFleet] = useState<any[]>([]);
+  const [origin, setOrigin] = useState("");
+  const [destination, setDestination] = useState("");
+  const [distance, setDistance] = useState("");
+  const [demandY, setDemandY] = useState("");
+  const [demandJ, setDemandJ] = useState("");
+  const [demandF, setDemandF] = useState("");
 
   async function optimizeAll() {
     setLoading(true);
@@ -57,17 +63,51 @@ export default function Home() {
 
         <div className="mb-6 p-4 bg-white rounded shadow">
           <div className="font-semibold mb-2">Add Route</div>
-          <div className="flex gap-2 mb-2">
-            <input placeholder="Origin" id="origin" className="border p-2 rounded w-1/4" />
-            <input placeholder="Destination" id="destination" className="border p-2 rounded w-1/4" />
-            <input placeholder="Distance" id="distance" className="border p-2 rounded w-1/4" />
+          <div className="flex flex-wrap gap-2 mb-2">
+            <input
+              placeholder="Origin"
+              value={origin}
+              onChange={(e) => setOrigin(e.target.value)}
+              className="border p-2 rounded w-32"
+            />
+            <input
+              placeholder="Destination"
+              value={destination}
+              onChange={(e) => setDestination(e.target.value)}
+              className="border p-2 rounded w-32"
+            />
+            <input
+              placeholder="Distance"
+              value={distance}
+              onChange={(e) => setDistance(e.target.value)}
+              className="border p-2 rounded w-28"
+            />
+            <input
+              placeholder="Y"
+              value={demandY}
+              onChange={(e) => setDemandY(e.target.value)}
+              className="border p-2 rounded w-20"
+            />
+            <input
+              placeholder="J"
+              value={demandJ}
+              onChange={(e) => setDemandJ(e.target.value)}
+              className="border p-2 rounded w-20"
+            />
+            <input
+              placeholder="F"
+              value={demandF}
+              onChange={(e) => setDemandF(e.target.value)}
+              className="border p-2 rounded w-20"
+            />
             <button
               onClick={async () => {
-                const origin = (document.getElementById("origin") as HTMLInputElement).value;
-                const destination = (document.getElementById("destination") as HTMLInputElement).value;
-                const distance = parseInt((document.getElementById("distance") as HTMLInputElement).value);
+                const dist = parseInt(distance);
+                const y = parseInt(demandY) || 0;
+                const j = parseInt(demandJ) || 0;
+                const f = parseInt(demandF) || 0;
 
-                if (!origin || !destination || !distance) return;
+                if (!origin || !destination || !dist) return;
 
                 await fetch("/api/routes", {
                   method: "POST",
@@ -75,12 +115,19 @@ export default function Home() {
                   body: JSON.stringify({
                     origin,
                     destination,
-                    distance,
-                    demand_y: 0,
-                    demand_j: 0,
-                    demand_f: 0,
+                    distance: dist,
+                    demand_y: y,
+                    demand_j: j,
+                    demand_f: f,
                   }),
                 });
+
+                setOrigin("");
+                setDestination("");
+                setDistance("");
+                setDemandY("");
+                setDemandJ("");
+                setDemandF("");
 
                 alert("Route saved");
               }}
@@ -91,7 +138,7 @@ export default function Home() {
           </div>
 
           <div className="text-xs text-zinc-500">
-            (Demand + configs coming next)
+            (Enter demand for Y / J / F to get meaningful optimization)
           </div>
         </div>
 
@@ -133,10 +180,10 @@ export default function Home() {
                 Distance: {route.distance} km
               </div>
 
-              {route.optimized?.total_profit_per_day && (
+              {route.optimized?.total_profit_per_week && (
                 <div className="mt-2 text-green-600 font-medium">
-                  Profit/day: $
-                  {route.optimized.total_profit_per_day.toLocaleString()}
+                  Profit/week: $
+                  {route.optimized.total_profit_per_week.toLocaleString()}
                 </div>
               )}
               {(() => {
@@ -180,13 +227,26 @@ export default function Home() {
                   <div>Config → Y:{p.config.y} J:{p.config.j} F:{p.config.f}</div>
                   <div>{p.tpd} trips/day</div>
                   <div className="text-green-700">
-                    ${p.daily_profit.toLocaleString()} / day
+                    ${p.profit_per_week.toLocaleString()} / week
                   </div>
                   <div className="text-blue-600">
                     ${Math.round(p.profit_per_hour).toLocaleString()} / hr
                   </div>
                 </div>
               ))}
+              {route.optimized?.marginal_values?.length > 0 && (
+                <div className="mt-3 border-t pt-2">
+                  <div className="font-medium text-sm mb-1">Marginal Value</div>
+                  {route.optimized.marginal_values.map((m: any, i: number) => (
+                    <div key={i} className="text-sm text-zinc-600">
+                      {m.aircraft}: 
+                      <span className={m.value > 0 ? "text-green-600" : "text-red-500"}>
+                        ${Math.round(m.value).toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
