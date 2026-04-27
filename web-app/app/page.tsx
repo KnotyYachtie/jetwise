@@ -13,10 +13,13 @@ export default function Home() {
     setLoading(true);
     setError(null);
     try {
+      const dbRes = await fetch("/api/routes");
+      const dbData = await dbRes.json();
+
       const res = await fetch("/api/optimize-all", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ routes: manualRoutes }),
+        body: JSON.stringify({ routes: dbData.routes }),
       });
 
       if (!res.ok) {
@@ -59,17 +62,27 @@ export default function Home() {
             <input placeholder="Destination" id="destination" className="border p-2 rounded w-1/4" />
             <input placeholder="Distance" id="distance" className="border p-2 rounded w-1/4" />
             <button
-              onClick={() => {
+              onClick={async () => {
                 const origin = (document.getElementById("origin") as HTMLInputElement).value;
                 const destination = (document.getElementById("destination") as HTMLInputElement).value;
                 const distance = parseInt((document.getElementById("distance") as HTMLInputElement).value);
 
                 if (!origin || !destination || !distance) return;
 
-                setManualRoutes((prev) => [
-                  ...prev,
-                  { id: Date.now().toString(), origin, destination, distance },
-                ]);
+                await fetch("/api/routes", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    origin,
+                    destination,
+                    distance,
+                    demand_y: 0,
+                    demand_j: 0,
+                    demand_f: 0,
+                  }),
+                });
+
+                alert("Route saved");
               }}
               className="bg-blue-600 text-white px-4 rounded"
             >
