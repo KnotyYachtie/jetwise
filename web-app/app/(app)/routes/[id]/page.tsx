@@ -15,6 +15,7 @@ type RouteRes = {
     distance: number;
     hub: string | null;
     demand: { y: number; j: number; f: number };
+    prices: { y: number; j: number; f: number };
     current: {
       aircraft: { type: string; config: { y: number; j: number; f: number } }[];
       weekly_profit_per_week?: number;
@@ -131,6 +132,14 @@ export default function RouteDetailPage() {
             Y {r.demand.y} · J {r.demand.j} · F {r.demand.f}
           </p>
         </JwCard>
+        <JwCard title="Ticket prices" subtitle="Backbone formula (per one-way seat)">
+          <p className="font-mono text-cyan-100">
+            Y {usd(r.prices.y)} · J {usd(r.prices.j)} · F {usd(r.prices.f)}
+          </p>
+        </JwCard>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-1">
         <JwCard title="Comparison" subtitle="Current vs optimized (weekly)">
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between">

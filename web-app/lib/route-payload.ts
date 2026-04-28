@@ -1,4 +1,4 @@
-import type { Company } from "./economics";
+import { ticketPrices, type Company, type TicketPrices } from "./economics";
 import {
   buildComparison,
   evaluateCurrentAssignment,
@@ -38,6 +38,7 @@ export type OptimizedApi = Omit<OptimizedRouteResult, "scheduling_summary"> & {
 
 export type RoutePayload = DbRoute & {
   demand: Demand;
+  prices: TicketPrices;
   current: {
     aircraft: CurrentAircraftRow[];
     notes: string | null;
@@ -78,6 +79,7 @@ export function enrichRoute(
 
   const cur = evaluateCurrentAssignment(route.distance, demand, aircraft, company);
   const opt = optimizeRoute(route.distance, demand, company);
+  const prices = ticketPrices(route.distance);
   const comparison = buildComparison(
     cur.total_profit_per_week,
     cur.fulfilled,
@@ -87,6 +89,7 @@ export function enrichRoute(
   return {
     ...route,
     demand,
+    prices,
     current: {
       aircraft,
       notes: route.notes,

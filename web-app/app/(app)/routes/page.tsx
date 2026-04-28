@@ -11,6 +11,7 @@ type RouteList = {
   origin: string;
   destination: string;
   distance: number;
+  prices: { y: number; j: number; f: number };
   hub: string | null;
   current: { weekly_profit_per_week?: number; aircraft: unknown[] };
   optimized: {
@@ -139,6 +140,10 @@ export default function RoutesListPage() {
                     value={`${Math.round(sched?.threshold_proximity_minutes ?? 0)} min`}
                     warn={warnBracket}
                   />
+                </div>
+                <div className="mt-3 text-xs text-zinc-400">
+                  Ticket prices · Y {usd(r.prices?.y ?? 0)} · J {usd(r.prices?.j ?? 0)} · F{" "}
+                  {usd(r.prices?.f ?? 0)}
                 </div>
               </article>
             </Link>
