@@ -228,8 +228,9 @@ export default function RouteDetailPage() {
         </button>
       </div>
 
-      <section className="overflow-hidden rounded-3xl border border-cyan-500/20 bg-[var(--jw-panel)] shadow-[0_0_90px_-30px_rgba(34,211,238,0.4)] backdrop-blur-xl">
-        <div className="border-b border-cyan-500/15 bg-gradient-to-b from-fuchsia-500/30 via-violet-500/20 to-transparent p-4 sm:p-6">
+      <section className="overflow-hidden rounded-3xl border border-cyan-500/20 bg-[linear-gradient(160deg,rgba(6,18,24,0.96),rgba(5,13,20,0.92))] shadow-[0_0_90px_-30px_rgba(34,211,238,0.35)] backdrop-blur-xl">
+        <div className="relative border-b border-cyan-500/20 bg-[radial-gradient(120%_90%_at_50%_120%,rgba(28,190,196,0.33),transparent_62%),linear-gradient(180deg,rgba(11,28,39,0.98)_0%,rgba(8,23,31,0.92)_45%,rgba(8,45,53,0.72)_100%)] p-4 sm:p-6">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-7 bg-gradient-to-t from-cyan-300/10 to-transparent" />
           <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-400">{r.hub ?? "Unassigned hub"}</p>
           <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
             <div>
@@ -237,16 +238,29 @@ export default function RouteDetailPage() {
               <p className="mt-1 text-xs text-zinc-300">📍 {originHeadline ?? r.origin}</p>
             </div>
             <div className="flex min-w-[88px] flex-col items-center justify-center">
-              <div className="h-px w-full bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
-              <div className="-mt-2 rounded-full border border-cyan-400/40 bg-black/50 px-2 py-0.5 text-sm">✈️</div>
-              <div className="-mt-2 h-px w-full bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
+              <div className="h-px w-full bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" />
+              <div className="-mt-2 rounded-full border border-cyan-300/55 bg-[#06131c]/80 p-1.5 shadow-[0_0_18px_-8px_rgba(34,211,238,0.8)]">
+                <svg
+                  viewBox="0 0 24 24"
+                  aria-hidden
+                  className="h-4 w-4 text-cyan-200"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.9"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M3 11.3 20.2 4.2a.8.8 0 0 1 1 .98l-3.05 8.36a2.1 2.1 0 0 1-1.23 1.24l-8.38 3.05a.8.8 0 0 1-.98-1l2.03-4.95-4.61-1.02a.8.8 0 0 1 0-1.57l4.6-1.03 2.05-4.95a.8.8 0 0 1 1.5.58L12.2 8.3l4.31.96a.8.8 0 0 1 0 1.56l-4.3.96-1.1 2.68 4.62-1.69a.7.7 0 0 0 .41-.41l1.69-4.62-2.68 1.1-.96 4.3a.8.8 0 0 1-1.56 0l-.96-4.31-2.67 1.1-1.69 4.62a.8.8 0 0 1-1.5-.57l2.03-4.95-2.54-.56Z" />
+                </svg>
+              </div>
+              <div className="-mt-2 h-px w-full bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" />
             </div>
             <div className="text-right">
               <p className="font-mono text-3xl font-semibold tracking-wide text-white">{r.destination}</p>
               <p className="mt-1 text-xs text-zinc-300">📍 {destHeadline ?? r.destination}</p>
             </div>
           </div>
-          <p className="mt-3 text-sm text-zinc-400">
+            <p className="mt-3 text-sm text-zinc-300">
             {Math.round(r.distance)} km · {opt.scheduling.flight_time_hours.toFixed(2)}h one-way · trips/wk{" "}
             {opt.scheduling.trips_per_week}
           </p>
@@ -287,8 +301,8 @@ export default function RouteDetailPage() {
               <Stat title="Demand fulfilled" value={`${pct(comp.current_demand_fulfilled)} → ${pct(comp.optimized_demand_fulfilled)}`} />
             </div>
             {optimizedTripBlend ? (
-              <div className="mt-3 rounded-xl border border-cyan-500/20 bg-cyan-500/[0.04] p-3">
-                <p className="text-[10px] uppercase tracking-widest text-cyan-200/80">
+              <div className="mt-3 rounded-xl border border-cyan-400/25 bg-cyan-400/[0.06] p-3">
+                <p className="text-[10px] uppercase tracking-widest text-cyan-100/85">
                   Optimized per trip · weighted by {optimizedTripBlend.rotations_per_week.toFixed(0)} rotations / wk
                 </p>
                 <div className="mt-2 grid gap-3 sm:grid-cols-3">
