@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "import-airports": "node scripts/import-airports.mjs"
+    "import-airports": "node scripts/import-airports.mjs",
+    "import-airports-csv": "node scripts/import-airports-slim-csv.mjs"
   },
   "dependencies": {
     "@vercel/postgres": "^0.10.0",
@@ -17,6 +18,7 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "csv-parse": "^5.6.0",
     "dotenv": "^16.4.5",
     "pg": "^8.13.1",
     "@tailwindcss/postcss": "^4",

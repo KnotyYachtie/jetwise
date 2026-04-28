@@ -74,21 +74,31 @@ async function main() {
       const country = (a.country ?? "").trim().toUpperCase() || null;
       const city = displayCity(a);
       const iata = normalizeIata(a);
-      values.push(icao, name, city, country, iata);
-      tupleSql.push(`($${p},$${p + 1},$${p + 2},$${p + 3},$${p + 4})`);
-      p += 5;
+      const latN = a.lat != null && a.lat !== "" ? Number(a.lat) : null;
+      const lonN = a.lon != null && a.lon !== "" ? Number(a.lon) : null;
+      const lat = Number.isFinite(latN) ? latN : null;
+      const lon = Number.isFinite(lonN) ? lonN : null;
+      const apType = (a.type ?? "").toString().trim() || null;
+      values.push(icao, name, city, country, iata, lat, lon, apType, null);
+      tupleSql.push(`($${p},$${p + 1},$${p + 2},$${p + 3},$${p + 4},$${p + 5},$${p + 6},$${p + 7},$${p + 8})`);
+      p += 9;
     }
 
     if (!tupleSql.length) continue;
 
     const text = `
-      INSERT INTO airport_lookup (icao, name, city, country, iata)
+      INSERT INTO airport_lookup (
+        icao, name, city, country, iata, lat, lon, airport_type, scheduled_service
+      )
       VALUES ${tupleSql.join(",")}
       ON CONFLICT (icao) DO UPDATE SET
         name = EXCLUDED.name,
         city = EXCLUDED.city,
         country = EXCLUDED.country,
-        iata = EXCLUDED.iata
+        iata = EXCLUDED.iata,
+        lat = EXCLUDED.lat,
+        lon = EXCLUDED.lon,
+        airport_type = EXCLUDED.airport_type
     `;
     await client.query(text, values);
     inserted += tupleSql.length;

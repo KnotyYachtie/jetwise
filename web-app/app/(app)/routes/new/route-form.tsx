@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AirportHubCombobox } from "@/components/AirportHubCombobox";
 import { JwCard } from "@/components/JwCard";
 import { api } from "@/lib/api-client";
@@ -22,6 +22,51 @@ export default function RouteForm({ editId }: { editId?: string }) {
   const [aircraft, setAircraft] = useState<Ac[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [distanceNote, setDistanceNote] = useState<string | null>(null);
+  const skipAutoDistance = useRef(false);
+
+  useEffect(() => {
+    skipAutoDistance.current = false;
+  }, [origin, destination]);
+
+  useEffect(() => {
+    const o = origin.trim().toUpperCase();
+    const d = destination.trim().toUpperCase();
+    if (o.length < 3 || d.length < 3 || o === d) {
+      setDistanceNote(null);
+      return;
+    }
+    if (skipAutoDistance.current) return;
+
+    const ac = new AbortController();
+    const t = setTimeout(() => {
+      fetch(
+        `/api/airports/distance?origin=${encodeURIComponent(o)}&destination=${encodeURIComponent(d)}`,
+        { credentials: "include", signal: ac.signal }
+      )
+        .then((r) => r.json() as Promise<{ roundedKm?: number; missing?: (string | null)[] }>)
+        .then((body) => {
+          if (skipAutoDistance.current) return;
+          if (typeof body.roundedKm === "number" && Number.isFinite(body.roundedKm)) {
+            setDistance(String(body.roundedKm));
+            setDistanceNote(null);
+          } else {
+            const miss = (body.missing ?? []).filter(Boolean) as string[];
+            setDistanceNote(
+              miss.length
+                ? `No coordinates in the database for: ${miss.join(", ")}. Enter km manually or re-import airports.`
+                : "Could not compute distance — enter km manually."
+            );
+          }
+        })
+        .catch(() => {});
+    }, 400);
+
+    return () => {
+      clearTimeout(t);
+      ac.abort();
+    };
+  }, [origin, destination]);
 
   useEffect(() => {
     if (!editId) return;
@@ -137,7 +182,20 @@ export default function RouteForm({ editId }: { editId?: string }) {
             />
           </div>
           <div className="sm:col-span-1">
-            <Field label="Distance (km)" value={distance} onChange={setDistance} inputMode="decimal" />
+            <Field
+              label="Distance (km)"
+              value={distance}
+              onChange={(v) => {
+                skipAutoDistance.current = true;
+                setDistance(v);
+                setDistanceNote(null);
+              }}
+              inputMode="decimal"
+            />
+            <p className="mt-1 text-[10px] text-zinc-600">
+              Auto-fills rounded great-circle distance when both ICAOs exist in <code className="text-zinc-500">airport_lookup</code> with coordinates. Edit the field to override and keep your value.
+            </p>
+            {distanceNote ? <p className="mt-1 text-[10px] text-amber-500/90">{distanceNote}</p> : null}
           </div>
         </div>
       </JwCard>

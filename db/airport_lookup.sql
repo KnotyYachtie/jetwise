@@ -6,7 +6,11 @@ CREATE TABLE IF NOT EXISTS airport_lookup (
   name TEXT NOT NULL,
   city TEXT,
   country TEXT,
-  iata TEXT
+  iata TEXT,
+  lat DOUBLE PRECISION,
+  lon DOUBLE PRECISION,
+  airport_type TEXT,
+  scheduled_service TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_airport_lookup_icao ON airport_lookup (icao);
