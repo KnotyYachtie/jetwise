@@ -1,35 +1,13 @@
-
-
+import { randomUUID } from "crypto";
 import { sql } from "@vercel/postgres";
 import { NextResponse } from "next/server";
+import { replaceRouteAssignments, type AssignmentInput } from "@/lib/assignments-sync";
+import { isValidHub } from "@/lib/hubs";
+import { getEnrichedRouteById, getEnrichedRoutes } from "@/lib/routes-data";
 
-// GET all routes with assignments
 export async function GET() {
   try {
-    const routesRes = await sql`SELECT * FROM routes ORDER BY id DESC`;
-    const assignmentsRes = await sql`SELECT * FROM route_assignments`;
-
-    const routes = routesRes.rows.map((route: any) => {
-      const aircraft = assignmentsRes.rows
-        .filter((a: any) => a.route_id === route.id)
-        .sort((a: any, b: any) => a.position - b.position)
-        .map((a: any) => ({
-          type: a.aircraft_type,
-          config: {
-            y: a.config_y,
-            j: a.config_j,
-            f: a.config_f,
-          },
-        }));
-
-      return {
-        ...route,
-        current: {
-          aircraft,
-        },
-      };
-    });
-
+    const routes = await getEnrichedRoutes();
     return NextResponse.json({ routes });
   } catch (err) {
     console.error(err);
@@ -37,12 +15,11 @@ export async function GET() {
   }
 }
 
-// POST create new route
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-
     const {
+      id: bodyId,
       origin,
       destination,
       distance,
@@ -51,19 +28,60 @@ export async function POST(req: Request) {
       demand_j,
       demand_f,
       technical_stop,
-    } = body;
+      status,
+      notes,
+      assignments,
+    } = body as {
+      id?: string;
+      origin: string;
+      destination: string;
+      distance: number;
+      hub?: string | null;
+      demand_y?: number;
+      demand_j?: number;
+      demand_f?: number;
+      technical_stop?: string | null;
+      status?: string;
+      notes?: string | null;
+      assignments?: AssignmentInput[];
+    };
 
-    if (!origin || !destination || !distance) {
+    if (!origin || !destination || distance == null) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
+    if (hub && !isValidHub(hub)) {
+      return NextResponse.json({ error: "Invalid hub ICAO" }, { status: 400 });
+    }
 
-    const result = await sql`
-      INSERT INTO routes (origin, destination, distance, hub, demand_y, demand_j, demand_f, technical_stop)
-      VALUES (${origin}, ${destination}, ${distance}, ${hub || null}, ${demand_y || 0}, ${demand_j || 0}, ${demand_f || 0}, ${technical_stop || null})
-      RETURNING id
+    const id = bodyId || randomUUID();
+    const dist = Number(distance);
+
+    await sql`
+      INSERT INTO routes (
+        id, origin, destination, distance, hub,
+        demand_y, demand_j, demand_f, technical_stop, status, notes, updated_at
+      ) VALUES (
+        ${id},
+        ${String(origin).toUpperCase()},
+        ${String(destination).toUpperCase()},
+        ${dist},
+        ${hub ? String(hub).toUpperCase() : null},
+        ${Number(demand_y) || 0},
+        ${Number(demand_j) || 0},
+        ${Number(demand_f) || 0},
+        ${technical_stop ? String(technical_stop).toUpperCase() : null},
+        ${status || "active"},
+        ${notes ?? null},
+        NOW()
+      )
     `;
 
-    return NextResponse.json({ success: true, id: result.rows[0].id });
+    if (Array.isArray(assignments)) {
+      await replaceRouteAssignments(id, assignments);
+    }
+
+    const route = await getEnrichedRouteById(id);
+    return NextResponse.json({ success: true, id, route });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "Insert failed" }, { status: 500 });

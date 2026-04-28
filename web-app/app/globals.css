@@ -1,26 +1,42 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --jw-bg: #000000;
+  --jw-panel: rgba(12, 18, 28, 0.72);
+  --jw-border: rgba(56, 189, 248, 0.35);
+  --jw-glow: rgba(56, 189, 248, 0.55);
+  --jw-text: #e4e4e7;
+  --jw-muted: #71717a;
+  --jw-accent: #22d3ee;
+  --jw-warn: #fb923c;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: radial-gradient(ellipse 120% 80% at 50% -20%, rgba(34, 211, 238, 0.14), transparent),
+    var(--jw-bg);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: transparent;
+  color: var(--jw-text);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+@keyframes jw-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.jw-animate-pulse-slow {
+  animation: jw-pulse 3s ease-in-out infinite;
 }
