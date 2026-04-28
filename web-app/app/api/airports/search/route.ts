@@ -32,17 +32,34 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ results: hubPart });
   }
 
-  const pattern = `%${q}%`;
+  const qu = q.toUpperCase();
+  const pattern = `%${qu}%`;
+  const starts = `${qu}%`;
+
   try {
     const ext = await sql`
       SELECT icao, name, city, country, iata
       FROM airport_lookup
       WHERE icao ILIKE ${pattern}
-         OR iata ILIKE ${pattern}
+         OR NULLIF(TRIM(iata), '') IS NOT NULL AND TRIM(iata) ILIKE ${pattern}
          OR name ILIKE ${pattern}
          OR city ILIKE ${pattern}
          OR country ILIKE ${pattern}
-      ORDER BY icao ASC
+      ORDER BY
+        CASE
+          WHEN NULLIF(TRIM(iata), '') IS NOT NULL AND UPPER(TRIM(iata)) = ${qu} THEN 0
+          WHEN UPPER(icao) = ${qu} THEN 1
+          WHEN NULLIF(TRIM(iata), '') IS NOT NULL AND TRIM(iata) ILIKE ${starts} THEN 2
+          WHEN icao ILIKE ${starts} THEN 3
+          WHEN name ILIKE ${starts} THEN 4
+          WHEN name ILIKE ${pattern} THEN 5
+          WHEN city ILIKE ${pattern} THEN 6
+          WHEN country ILIKE ${pattern} THEN 7
+          ELSE 8
+        END,
+        CASE WHEN icao ~ '^[0-9]' THEN 1 ELSE 0 END,
+        CASE WHEN NULLIF(TRIM(iata), '') IS NULL THEN 1 ELSE 0 END,
+        icao ASC
       LIMIT 30
     `;
     const seen = new Set(hubPart.map((h) => h.icao));

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { OriginHubCombobox } from "@/components/OriginHubCombobox";
+import { AirportHubCombobox } from "@/components/AirportHubCombobox";
 import { JwCard } from "@/components/JwCard";
 import { api } from "@/lib/api-client";
 import { isValidHub } from "@/lib/hubs";
@@ -118,17 +118,31 @@ export default function RouteForm({ editId }: { editId?: string }) {
       </div>
       {err ? <p className="text-sm text-orange-400">{err}</p> : null}
 
-      <JwCard title="Leg" subtitle="Great-circle distance (km); origin drives hub when it is a company hub">
+      <JwCard
+        title="Leg"
+        subtitle="Great-circle distance (km); origin drives hub when it is a company hub"
+        className="relative z-30"
+      >
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <OriginHubCombobox value={origin} onChange={setOrigin} />
+            <AirportHubCombobox value={origin} onChange={setOrigin} />
           </div>
-          <Field label="Destination" value={destination} onChange={(v) => setDestination(v.toUpperCase())} />
-          <Field label="Distance (km)" value={distance} onChange={setDistance} inputMode="decimal" />
+          <div className="sm:col-span-2">
+            <AirportHubCombobox
+              label="Destination (hub or airport)"
+              hint="Same search as origin — hubs first (when matched), then database airports."
+              placeholder="e.g. KJFK, LHR, or EGLL"
+              value={destination}
+              onChange={setDestination}
+            />
+          </div>
+          <div className="sm:col-span-1">
+            <Field label="Distance (km)" value={distance} onChange={setDistance} inputMode="decimal" />
+          </div>
         </div>
       </JwCard>
 
-      <JwCard title="Demand" subtitle="Economy / business / first">
+      <JwCard title="Demand" subtitle="Economy / business / first" className="relative z-0">
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Y" value={demandY} onChange={setDemandY} inputMode="numeric" />
           <Field label="J" value={demandJ} onChange={setDemandJ} inputMode="numeric" />

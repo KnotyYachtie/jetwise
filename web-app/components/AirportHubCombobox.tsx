@@ -4,19 +4,32 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { filterHubsByQuery, formatHubLine } from "@/lib/hubs";
 import type { AirportSearchResult } from "@/lib/airport-search";
 
-type Props = {
+export type AirportHubComboboxProps = {
   value: string;
   onChange: (icao: string) => void;
   id?: string;
+  /** Label above the field */
+  label?: string;
+  hint?: string;
+  placeholder?: string;
 };
 
+const defaultLabel = "Origin (hub or airport)";
+const defaultHint = "Company hubs + search; 2+ letters load more airports from the database.";
+
 /**
- * Origin = departure airport; company hubs are listed first (alphabetical when empty),
- * then DB-backed airports when query length ≥ 2 (debounced + server rate limit).
+ * Hub + `airport_lookup` search (debounced, 2+ chars for API). Reused for origin and destination.
  */
-export function OriginHubCombobox({ value, onChange, id: idProp }: Props) {
+export function AirportHubCombobox({
+  value,
+  onChange,
+  id: idProp,
+  label = defaultLabel,
+  hint = defaultHint,
+  placeholder = "e.g. KMIA, LGA, or EGLL",
+}: AirportHubComboboxProps) {
   const genId = useId();
-  const listboxId = idProp ?? `origin-hub-${genId}`;
+  const listboxId = idProp ?? `airport-hub-${genId}`;
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [apiResults, setApiResults] = useState<AirportSearchResult[] | null>(null);
@@ -113,9 +126,9 @@ export function OriginHubCombobox({ value, onChange, id: idProp }: Props) {
   return (
     <div ref={containerRef} className="relative">
       <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500" htmlFor={listboxId + "-input"}>
-        Origin (hub or airport)
+        {label}
       </label>
-      <p className="mb-1 text-[10px] text-zinc-600">Company hubs + search; 2+ letters load more airports from the database.</p>
+      <p className="mb-1 text-[10px] text-zinc-600">{hint}</p>
       <input
         id={listboxId + "-input"}
         type="text"
@@ -129,13 +142,13 @@ export function OriginHubCombobox({ value, onChange, id: idProp }: Props) {
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
         className="mt-1 w-full rounded-lg border border-zinc-800 bg-black/50 px-3 py-2 text-sm text-white outline-none ring-0 focus:border-cyan-500/50"
-        placeholder="e.g. KMIA or EGLL"
+        placeholder={placeholder}
       />
       {open ? (
         <ul
           id={listboxId + "-listbox"}
           role="listbox"
-          className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-cyan-500/25 bg-zinc-950 py-1 text-sm shadow-[0_0_40px_rgba(0,0,0,0.5)]"
+          className="absolute left-0 right-0 top-full z-[200] mt-1 max-h-64 overflow-y-auto rounded-lg border border-cyan-500/25 bg-zinc-950 py-1 text-sm shadow-[0_12px_48px_rgba(0,0,0,0.85)]"
         >
           {loading && value.trim().length >= 2 ? (
             <li className="px-3 py-2 text-xs text-zinc-500">Searching…</li>
@@ -177,3 +190,6 @@ export function OriginHubCombobox({ value, onChange, id: idProp }: Props) {
     </div>
   );
 }
+
+/** @deprecated Use AirportHubCombobox — alias kept for older imports */
+export const OriginHubCombobox = AirportHubCombobox;
