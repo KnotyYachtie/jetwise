@@ -54,11 +54,19 @@ export default function SettingsPage() {
     );
   }
 
-  const fields: { key: keyof Company; label: string }[] = [
+  const fields: { key: keyof Company; label: string; hint?: string }[] = [
     { key: "fuel_price", label: "Fuel price" },
     { key: "co2_price", label: "CO₂ price" },
-    { key: "fuel_training", label: "Fuel training %" },
-    { key: "co2_training", label: "CO₂ training %" },
+    {
+      key: "fuel_training",
+      label: "Fuel training %",
+      hint: "100% = 3% lower modeled fuel burn vs 0%",
+    },
+    {
+      key: "co2_training",
+      label: "CO₂ training %",
+      hint: "100% = 5% lower modeled emissions vs 0%",
+    },
     { key: "repair_training", label: "Repair training %" },
     { key: "load", label: "Load factor (0–1)" },
     { key: "ci", label: "Cost index (CI)" },
@@ -85,6 +93,7 @@ export default function SettingsPage() {
                   setDraft((d) => (d ? { ...d, [f.key]: Number.isFinite(v) ? v : d[f.key] } : d));
                 }}
               />
+              {f.hint ? <p className="mt-1 text-[10px] text-zinc-600">{f.hint}</p> : null}
             </label>
           ))}
         </div>

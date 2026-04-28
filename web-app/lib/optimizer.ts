@@ -9,6 +9,14 @@ import type { CurrentAircraftRow, Demand } from "./types";
 
 export type Config = { y: number; j: number; f: number };
 
+export type TripCostBreakdown = {
+  fuel: number;
+  co2: number;
+  acheck: number;
+  repair: number;
+  total: number;
+};
+
 export type FleetMixRow = {
   type: string;
   name: string;
@@ -17,6 +25,7 @@ export type FleetMixRow = {
   flight_time_hours: number;
   revenue_per_flight: number;
   cost_per_flight: number;
+  cost_breakdown: TripCostBreakdown;
   profit_per_flight: number;
   profit_per_hour: number;
   profit_per_week: number;
@@ -43,6 +52,7 @@ export type ComparisonResult = {
 };
 
 function toRow(ac: Aircraft, fe: FlightEconomics): FleetMixRow {
+  const cb = fe.cost_breakdown;
   return {
     type: ac.shortCode,
     name: ac.name,
@@ -50,7 +60,14 @@ function toRow(ac: Aircraft, fe: FlightEconomics): FleetMixRow {
     trips_per_week: fe.trips_per_week,
     flight_time_hours: fe.scheduling.flight_time_hours,
     revenue_per_flight: fe.revenue_per_flight,
-    cost_per_flight: fe.cost_breakdown.total,
+    cost_per_flight: cb.total,
+    cost_breakdown: {
+      fuel: cb.fuel,
+      co2: cb.co2,
+      acheck: cb.acheck,
+      repair: cb.repair,
+      total: cb.total,
+    },
     profit_per_flight: fe.profit_per_flight,
     profit_per_hour:
       fe.scheduling.flight_time_hours > 0 ? fe.profit_per_flight / fe.scheduling.flight_time_hours : 0,
@@ -146,13 +163,15 @@ function evaluateWithExtra(
   extra: "A380" | "A330",
   company: Company,
   distance: number,
-  demand: Demand
+  demand: Demand,
+  baselineWeeklyProfit: number
 ): number {
   const n380e = n380 + (extra === "A380" ? 1 : 0);
   const n330e = n330 + (extra === "A330" ? 1 : 0);
-  if (n380e + n330e > 5) return 0;
+  if (n380e + n330e > 5) return baselineWeeklyProfit;
   const result = evaluateComboCounts(n380e, n330e, company, distance, demand, 5);
-  return result?.total_profit_per_week ?? 0;
+  // Null = combo infeasible (e.g. extra frame cannot earn positive marginal trip). Use baseline so marginal ≈ 0, not −baseline.
+  return result?.total_profit_per_week ?? baselineWeeklyProfit;
 }
 
 function schedulingFromPlan(plan: FleetMixRow[]): SchedulingInfo {
@@ -206,8 +225,8 @@ export function optimizeRoute(
     };
   }
 
-  const withExtra330 = evaluateWithExtra(best.n380, best.n330, "A330", company, distance, demand);
-  const withExtra380 = evaluateWithExtra(best.n380, best.n330, "A380", company, distance, demand);
+  const withExtra330 = evaluateWithExtra(best.n380, best.n330, "A330", company, distance, demand, best.total);
+  const withExtra380 = evaluateWithExtra(best.n380, best.n330, "A380", company, distance, demand, best.total);
   const marg330 = withExtra330 - best.total;
   const marg380 = withExtra380 - best.total;
 

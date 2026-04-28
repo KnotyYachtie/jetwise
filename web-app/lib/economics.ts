@@ -124,10 +124,15 @@ export function seats(c: Config): number {
   return c.y + c.j + c.f;
 }
 
-/** Clamp training sliders so multipliers cannot invert fuel/co2/repair costs (e.g. repair_training=100 → −repair before clamp). */
+/** Slider 0–100; fuel/co₂ training scale modest fleet-wide efficiency gains (see constants below). */
 function clampPct(x: number): number {
   return Math.min(100, Math.max(0, x));
 }
+
+/** At 100% fuel training, modeled fuel consumption is reduced by this fraction vs 0% training. */
+const FUEL_TRAINING_MAX_REDUCTION = 0.03;
+/** At 100% CO₂ training, modeled CO₂ emissions are reduced by this fraction vs 0% training. */
+const CO2_TRAINING_MAX_REDUCTION = 0.05;
 
 export function totalCostPerFlight(
   aircraft: Aircraft,
@@ -140,14 +145,16 @@ export function totalCostPerFlight(
   const ct = clampPct(company.co2_training);
   const rt = clampPct(company.repair_training);
 
+  const fuel_use_mult = 1 - (ft / 100) * FUEL_TRAINING_MAX_REDUCTION;
   const fuel_lbs =
-    Math.max(0, 1 - ft / 100) * distance * aircraft.fuel * (company.ci / 500 + 0.6);
+    fuel_use_mult * distance * aircraft.fuel * (company.ci / 500 + 0.6);
   const fuel_cost = Math.max(0, (fuel_lbs * company.fuel_price) / 1000);
 
   const cap = capUnits(config);
   const s = seats(config);
+  const co2_emit_mult = 1 - (ct / 100) * CO2_TRAINING_MAX_REDUCTION;
   const co2_units =
-    Math.max(0, 1 - ct / 100) *
+    co2_emit_mult *
     (distance * aircraft.co2 * cap * company.load + s) *
     (company.ci / 2000 + 0.9);
   const co2_cost = Math.max(0, (co2_units * company.co2_price) / 1000);
