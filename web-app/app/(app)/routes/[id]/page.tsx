@@ -359,7 +359,7 @@ export default function RouteDetailPage() {
         </JwCard>
         <JwCard
           title="Optimized mix (system recommendation)"
-          subtitle={`Alternative configurations on this route: ${fleetTypeSummary(optimizedRows)} — cabin layouts and trip rates chosen to maximize weekly profit vs your current assignment`}
+          subtitle={`${fleetTypeSummary(optimizedRows)} — fleet size maximizes modeled weekly profit; each aircraft then fills an equal partition of Y/J/F demand so parallel hulls stay similarly configured`}
         >
           <ul className="space-y-3 text-sm">
             {opt.fleet_mix.length ? (

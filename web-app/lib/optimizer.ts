@@ -85,6 +85,20 @@ function soloWeeklyProfit(
   return evaluateAircraftOnRoute(ac, company, distance, demand)?.profit_per_week ?? -Infinity;
 }
 
+/** Partition route demand into `k` disjoint buckets with identical totals per class (largest-remainder split). */
+function splitDemandEqually(demand: Demand, k: number): Demand[] {
+  if (k < 1) return [];
+  const part = (n: number): number[] => {
+    const base = Math.floor(n / k);
+    const rem = n % k;
+    return Array.from({ length: k }, (_, i) => base + (i < rem ? 1 : 0));
+  };
+  const ys = part(demand.y);
+  const js = part(demand.j);
+  const fs = part(demand.f);
+  return Array.from({ length: k }, (_, i) => ({ y: ys[i]!, j: js[i]!, f: fs[i]! }));
+}
+
 export function orderAircraftForCombo(
   n380: number,
   n330: number,
@@ -156,8 +170,51 @@ function evaluateComboCounts(
   };
 }
 
-/** Marginal: +1 type, re-solve with up to 5 aircraft (analysis only). */
-function evaluateWithExtra(
+/**
+ * Same fleet counts as sequential allocation, but each aircraft optimizes against an ~equal share of route demand.
+ * Produces more uniform cabins across parallel hulls; weekly profit may differ from sequential greedy.
+ */
+function evaluateComboCountsEqualSplit(
+  n380: number,
+  n330: number,
+  company: Company,
+  distance: number,
+  demand: Demand,
+  maxPlanes = 4
+): { plan: FleetMixRow[]; total_profit_per_week: number; fulfilled: number } | null {
+  const totalPlanes = n380 + n330;
+  if (totalPlanes < 1 || totalPlanes > maxPlanes) return null;
+
+  const ordered = orderAircraftForCombo(n380, n330, company, distance, demand);
+  const chunks = splitDemandEqually(demand, ordered.length);
+  const planRows: { ac: Aircraft; fe: FlightEconomics }[] = [];
+
+  for (let i = 0; i < ordered.length; i++) {
+    const fe = evaluateAircraftOnRoute(ordered[i]!, company, distance, chunks[i]!);
+    if (!fe || fe.profit_per_flight <= 0) return null;
+    planRows.push({ ac: ordered[i]!, fe });
+  }
+
+  const total = planRows.reduce((s, p) => s + p.fe.profit_per_week, 0);
+  const served = planRows.reduce(
+    (acc, p) => ({
+      y: acc.y + p.fe.config.y,
+      j: acc.j + p.fe.config.j,
+      f: acc.f + p.fe.config.f,
+    }),
+    { y: 0, j: 0, f: 0 }
+  );
+  const fulfilled = demandFulfilledPercent(demand, served);
+
+  return {
+    plan: planRows.map((p) => toRow(p.ac, p.fe)),
+    total_profit_per_week: total,
+    fulfilled,
+  };
+}
+
+/** Marginal: +1 frame vs optimized baseline using equal-split economics (matches fleet_mix semantics). */
+function evaluateOneExtraPlaneEqualSplit(
   n380: number,
   n330: number,
   extra: "A380" | "A330",
@@ -169,8 +226,7 @@ function evaluateWithExtra(
   const n380e = n380 + (extra === "A380" ? 1 : 0);
   const n330e = n330 + (extra === "A330" ? 1 : 0);
   if (n380e + n330e > 5) return baselineWeeklyProfit;
-  const result = evaluateComboCounts(n380e, n330e, company, distance, demand, 5);
-  // Null = combo infeasible (e.g. extra frame cannot earn positive marginal trip). Use baseline so marginal ≈ 0, not −baseline.
+  const result = evaluateComboCountsEqualSplit(n380e, n330e, company, distance, demand, 5);
   return result?.total_profit_per_week ?? baselineWeeklyProfit;
 }
 
@@ -225,22 +281,43 @@ export function optimizeRoute(
     };
   }
 
-  const withExtra330 = evaluateWithExtra(best.n380, best.n330, "A330", company, distance, demand, best.total);
-  const withExtra380 = evaluateWithExtra(best.n380, best.n330, "A380", company, distance, demand, best.total);
-  const marg330 = withExtra330 - best.total;
-  const marg380 = withExtra380 - best.total;
+  const normalized = evaluateComboCountsEqualSplit(best.n380, best.n330, company, distance, demand);
+  const outputPlan = normalized ?? best;
+  const outputTotal = normalized?.total_profit_per_week ?? best.total;
+  const outputFulfilled = normalized?.fulfilled ?? best.fulfilled;
+
+  const withExtra330 = evaluateOneExtraPlaneEqualSplit(
+    best.n380,
+    best.n330,
+    "A330",
+    company,
+    distance,
+    demand,
+    outputTotal
+  );
+  const withExtra380 = evaluateOneExtraPlaneEqualSplit(
+    best.n380,
+    best.n330,
+    "A380",
+    company,
+    distance,
+    demand,
+    outputTotal
+  );
+  const marg330 = withExtra330 - outputTotal;
+  const marg380 = withExtra380 - outputTotal;
 
   return {
-    fleet_mix: best.plan,
-    total_profit_per_week: best.total,
-    demand_fulfilled_optimized: best.fulfilled,
+    fleet_mix: outputPlan.plan,
+    total_profit_per_week: outputTotal,
+    demand_fulfilled_optimized: outputFulfilled,
     marginal_a330_value: marg330,
     marginal_a380_value: marg380,
     marginal_values: [
       { aircraft: "A330", value: marg330 },
       { aircraft: "A380", value: marg380 },
     ],
-    scheduling_summary: schedulingFromPlan(best.plan),
+    scheduling_summary: schedulingFromPlan(outputPlan.plan),
   };
 }
 
