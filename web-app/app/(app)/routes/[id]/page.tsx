@@ -204,191 +204,144 @@ export default function RouteDetailPage() {
       : null;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <p className="text-xs uppercase tracking-widest text-zinc-500">{r.hub ?? "Unassigned hub"}</p>
-          {originHeadline != null || destHeadline != null ? (
-            <p className="mt-2 text-sm leading-snug text-zinc-400">
-              <span className="text-zinc-300">{originHeadline ?? r.origin}</span>
-              <span className="mx-2 text-zinc-600">→</span>
-              <span className="text-zinc-300">{destHeadline ?? r.destination}</span>
-            </p>
-          ) : null}
-          <h1 className="mt-1 font-mono text-2xl text-white">
-            {r.origin} → {r.destination}
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500">{Math.round(r.distance)} km</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => void persistOpt()}
-            className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-sm text-cyan-100"
-          >
-            Persist optimization
-          </button>
-          <Link
-            href={`/routes/new?edit=${r.id}`}
-            className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300"
-          >
-            Edit
-          </Link>
-          <button
-            type="button"
-            onClick={() => void remove()}
-            className="rounded-lg border border-orange-500/30 px-3 py-1.5 text-sm text-orange-300"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-
-      <JwCard title="Route economics (current assignment)" subtitle="Weekly totals plus rotation-weighted per-trip figures">
-        <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <Stat title="Revenue / wk" value={usd(currentRevenuePerWeek)} />
-          <Stat title="Cost / wk" value={usd(currentCostPerWeek)} />
-          <Stat title="Profit / wk" value={usd(r.current.weekly_profit_per_week ?? 0)} />
-          <Stat title="Profit / flight-hour" value={usd(currentProfitPerHour)} />
-        </div>
-        {currentTripBlend ? (
-          <div className="mt-4 rounded-lg border border-zinc-800/80 bg-black/25 p-4">
-            <p className="text-[10px] uppercase tracking-widest text-zinc-500">
-              Per trip (weighted by {currentTripBlend.rotations_per_week.toFixed(0)} rotations / wk)
-            </p>
-            <div className="mt-2 grid gap-3 sm:grid-cols-3">
-              <div>
-                <p className="text-[10px] text-zinc-500">Gross / trip</p>
-                <p className="font-mono text-sm text-zinc-200">Ticket revenue (Y+J+F)</p>
-                <p className="mt-1 font-mono text-cyan-100">{usd(currentTripBlend.gross_per_trip)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-500">Cost / trip</p>
-                <p className="font-mono text-sm text-zinc-200">Operating total</p>
-                <p className="mt-1 font-mono text-zinc-300">{usd(currentTripBlend.cost_per_trip)}</p>
-                <TripCostParts bd={currentTripBlend.breakdown} />
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-500">Net / trip</p>
-                <p className="font-mono text-sm text-zinc-200">Profit after operating costs</p>
-                <p className="mt-1 font-mono text-emerald-200/90">{usd(currentTripBlend.net_per_trip)}</p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <p className="mt-3 text-sm text-zinc-500">Assign aircraft to see per-trip breakdown.</p>
-        )}
-        <p className="mt-3 text-[10px] text-zinc-500">
-          Gross = ticket revenue per rotation; net = gross − operating cost (fuel, CO₂ charges, amortized checks,
-          repair reserve). Weekly figures multiply per-trip values by rotations/week per airframe and sum across your
-          fleet lines.
-        </p>
-      </JwCard>
-
-      <JwCard title="Optimization opportunity" subtitle="How much weekly profit your current configuration is leaking">
-        <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <Stat title="Optimized profit / wk" value={usd(opt.total_profit_per_week)} />
-          <Stat title="Current config leak / wk" value={usd(configLeakPerWeek)} highlight />
-          <Stat title="Optimized profit / flight-hour" value={usd(optimizedProfitPerHour)} />
-          <Stat
-            title="Demand fulfilled"
-            value={`${pct(comp.current_demand_fulfilled)} → ${pct(comp.optimized_demand_fulfilled)}`}
-          />
-        </div>
-        <p className="mt-3 text-[11px] leading-relaxed text-zinc-400">
-          Most of this gap is explained by{" "}
-          <span className="text-zinc-300">capacity vs demand</span>: the optimizer proposes{" "}
-          <span className="font-mono text-zinc-300">{optimizedRows.length}</span> deployed line
-          {optimizedRows.length === 1 ? "" : "s"} with cabin mixes that lift fulfillment (
-          {pct(comp.current_demand_fulfilled)} → {pct(comp.optimized_demand_fulfilled)}). Compare your assignment below
-          to <span className="text-cyan-200/90">Optimized mix</span> — same airport pair and schedule bracket; changes are
-          fleet count + seatmaps per aircraft type.
-        </p>
-        {optimizedTripBlend ? (
-          <div className="mt-4 rounded-lg border border-cyan-500/15 bg-cyan-500/[0.04] p-4">
-            <p className="text-[10px] uppercase tracking-widest text-cyan-200/70">
-              Optimized scenario — per trip (weighted · {optimizedTripBlend.rotations_per_week.toFixed(0)} rot/wk)
-            </p>
-            <div className="mt-2 grid gap-3 sm:grid-cols-3">
-              <div>
-                <p className="text-[10px] text-zinc-500">Gross / trip</p>
-                <p className="mt-1 font-mono text-sm text-cyan-50">{usd(optimizedTripBlend.gross_per_trip)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-500">Cost / trip</p>
-                <p className="mt-1 font-mono text-sm text-zinc-300">{usd(optimizedTripBlend.cost_per_trip)}</p>
-                <TripCostParts bd={optimizedTripBlend.breakdown} accent="cyan" />
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-500">Net / trip</p>
-                <p className="mt-1 font-mono text-sm text-emerald-200/90">{usd(optimizedTripBlend.net_per_trip)}</p>
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </JwCard>
-
-      <JwCard title="Route competitiveness" subtitle="How this route ranks against the rest of your network">
-        <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <Stat title="Current profit rank" value={currentRankLabel} />
-          <Stat title="Optimized profit rank" value={optimizedRankLabel} />
-          <Stat title="Delta vs current" value={usd(comp.delta_per_week)} highlight />
-          <Stat title="Trips / week (optimized)" value={String(opt.scheduling.trips_per_week)} />
-        </div>
-      </JwCard>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <JwCard title="Demand + ticket model" subtitle="Inputs used by the economics model">
-          <p className="font-mono text-cyan-100">
-            Demand: Y {r.demand.y} · J {r.demand.j} · F {r.demand.f}
-          </p>
-          <p className="mt-2 font-mono text-zinc-300">
-            Prices: Y {usd(r.prices.y)} · J {usd(r.prices.j)} · F {usd(r.prices.f)}
-          </p>
-        </JwCard>
-        <JwCard title="Scheduling pressure" subtitle="Block time and rotation frequency (optimized aircraft)">
-          <p className="text-sm text-zinc-300">
-            One-way time {opt.scheduling.flight_time_hours.toFixed(2)}h · trips / wk {opt.scheduling.trips_per_week} ·
-            bracket ~{opt.scheduling.trip_bracket}/day eq
-          </p>
-        </JwCard>
-      </div>
-
-      <JwCard
-        title="Marginal aircraft"
-        subtitle={`Extra weekly profit if one more aircraft could be added profitably vs the optimized baseline (deploy cap ${MAX_AIRCRAFT_PER_ROUTE} frames). Near zero means demand is saturated or the extra frame cannot earn positive marginal trips in this model.`}
-      >
-        <p className="text-sm">
-          A330: <span className="font-mono text-cyan-200">{usd(opt.marginal_a330_value)}</span> · A380:{" "}
-          <span className="font-mono text-cyan-200">{usd(opt.marginal_a380_value)}</span>
-        </p>
-      </JwCard>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <JwCard title="Current assignment (your input)" subtitle="Each line’s cabin layout with full trip economics">
-          <ul className="space-y-3 text-sm">
-            {currentRows.length ? (
-              currentRows.map((a, i) => (
-                <FleetLineDetail key={i} row={a} variant="muted" />
-              ))
-            ) : (
-              <p className="text-sm text-zinc-500">No airframes assigned</p>
-            )}
-          </ul>
-        </JwCard>
-        <JwCard
-          title="Optimized mix (system recommendation)"
-          subtitle={`${fleetTypeSummary(optimizedRows)} — fleet size maximizes modeled weekly profit; each aircraft then fills an equal partition of Y/J/F demand so parallel hulls stay similarly configured`}
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => void persistOpt()}
+          className="rounded-xl border border-cyan-400/40 bg-cyan-500/15 px-3 py-1.5 text-sm font-semibold text-cyan-100"
         >
-          <ul className="space-y-3 text-sm">
-            {opt.fleet_mix.length ? (
-              opt.fleet_mix.map((a, i) => <FleetLineDetail key={i} row={a} variant="optimized" />)
-            ) : (
-              <p className="text-sm text-zinc-500">No profitable mix in model</p>
-            )}
-          </ul>
-        </JwCard>
+          Persist optimization
+        </button>
+        <Link
+          href={`/routes/new?edit=${r.id}`}
+          className="rounded-xl border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300"
+        >
+          Edit
+        </Link>
+        <button
+          type="button"
+          onClick={() => void remove()}
+          className="rounded-xl border border-orange-500/40 px-3 py-1.5 text-sm text-orange-300"
+        >
+          Delete
+        </button>
       </div>
+
+      <section className="overflow-hidden rounded-3xl border border-cyan-500/20 bg-[var(--jw-panel)] shadow-[0_0_90px_-30px_rgba(34,211,238,0.4)] backdrop-blur-xl">
+        <div className="border-b border-cyan-500/15 bg-gradient-to-b from-fuchsia-500/30 via-violet-500/20 to-transparent p-4 sm:p-6">
+          <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-400">{r.hub ?? "Unassigned hub"}</p>
+          <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+            <div>
+              <p className="font-mono text-3xl font-semibold tracking-wide text-white">{r.origin}</p>
+              <p className="mt-1 text-xs text-zinc-300">📍 {originHeadline ?? r.origin}</p>
+            </div>
+            <div className="flex min-w-[88px] flex-col items-center justify-center">
+              <div className="h-px w-full bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
+              <div className="-mt-2 rounded-full border border-cyan-400/40 bg-black/50 px-2 py-0.5 text-sm">✈️</div>
+              <div className="-mt-2 h-px w-full bg-gradient-to-r from-transparent via-cyan-300/60 to-transparent" />
+            </div>
+            <div className="text-right">
+              <p className="font-mono text-3xl font-semibold tracking-wide text-white">{r.destination}</p>
+              <p className="mt-1 text-xs text-zinc-300">📍 {destHeadline ?? r.destination}</p>
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-zinc-400">
+            {Math.round(r.distance)} km · {opt.scheduling.flight_time_hours.toFixed(2)}h one-way · trips/wk{" "}
+            {opt.scheduling.trips_per_week}
+          </p>
+        </div>
+
+        <div className="space-y-6 p-4 sm:p-6">
+          <section>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Current assignment snapshot</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <Stat title="Revenue / wk" value={usd(currentRevenuePerWeek)} />
+              <Stat title="Cost / wk" value={usd(currentCostPerWeek)} />
+              <Stat title="Profit / wk" value={usd(r.current.weekly_profit_per_week ?? 0)} />
+              <Stat title="Profit / flight-hour" value={usd(currentProfitPerHour)} />
+            </div>
+            {currentTripBlend ? (
+              <div className="mt-3 rounded-xl border border-zinc-800/90 bg-black/25 p-3">
+                <p className="text-[10px] uppercase tracking-widest text-zinc-500">
+                  Per trip · weighted by {currentTripBlend.rotations_per_week.toFixed(0)} rotations / wk
+                </p>
+                <div className="mt-2 grid gap-3 sm:grid-cols-3">
+                  <MetricMini title="Gross / trip" value={usd(currentTripBlend.gross_per_trip)} />
+                  <div>
+                    <MetricMini title="Cost / trip" value={usd(currentTripBlend.cost_per_trip)} />
+                    <TripCostParts bd={currentTripBlend.breakdown} />
+                  </div>
+                  <MetricMini title="Net / trip" value={usd(currentTripBlend.net_per_trip)} tone="good" />
+                </div>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="border-t border-zinc-800/80 pt-5">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Optimization opportunity</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <Stat title="Optimized profit / wk" value={usd(opt.total_profit_per_week)} />
+              <Stat title="Leak vs current / wk" value={usd(configLeakPerWeek)} highlight />
+              <Stat title="Optimized profit / flight-hour" value={usd(optimizedProfitPerHour)} />
+              <Stat title="Demand fulfilled" value={`${pct(comp.current_demand_fulfilled)} → ${pct(comp.optimized_demand_fulfilled)}`} />
+            </div>
+            {optimizedTripBlend ? (
+              <div className="mt-3 rounded-xl border border-cyan-500/20 bg-cyan-500/[0.04] p-3">
+                <p className="text-[10px] uppercase tracking-widest text-cyan-200/80">
+                  Optimized per trip · weighted by {optimizedTripBlend.rotations_per_week.toFixed(0)} rotations / wk
+                </p>
+                <div className="mt-2 grid gap-3 sm:grid-cols-3">
+                  <MetricMini title="Gross / trip" value={usd(optimizedTripBlend.gross_per_trip)} />
+                  <div>
+                    <MetricMini title="Cost / trip" value={usd(optimizedTripBlend.cost_per_trip)} />
+                    <TripCostParts bd={optimizedTripBlend.breakdown} accent="cyan" />
+                  </div>
+                  <MetricMini title="Net / trip" value={usd(optimizedTripBlend.net_per_trip)} tone="good" />
+                </div>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="border-t border-zinc-800/80 pt-5">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Route model context</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <Stat title="Current rank" value={currentRankLabel} />
+              <Stat title="Optimized rank" value={optimizedRankLabel} />
+              <Stat title="Delta vs current" value={usd(comp.delta_per_week)} highlight />
+              <Stat title="Bracket (~daily eq)" value={String(opt.scheduling.trip_bracket)} />
+            </div>
+            <p className="mt-3 text-xs text-zinc-400">
+              Demand Y {r.demand.y} · J {r.demand.j} · F {r.demand.f} · Ticket Y {usd(r.prices.y)} · J {usd(r.prices.j)} · F {usd(r.prices.f)}
+            </p>
+          </section>
+
+          <section className="border-t border-zinc-800/80 pt-5">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Current assignment lines</p>
+            <ul className="mt-3 space-y-3 text-sm">
+              {currentRows.length ? (
+                currentRows.map((a, i) => <FleetLineDetail key={i} row={a} variant="muted" />)
+              ) : (
+                <p className="text-sm text-zinc-500">No airframes assigned</p>
+              )}
+            </ul>
+          </section>
+
+          <section className="border-t border-zinc-800/80 pt-5">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Optimized mix</p>
+            <p className="mt-1 text-xs text-zinc-400">
+              {fleetTypeSummary(optimizedRows)} · Deploy cap {MAX_AIRCRAFT_PER_ROUTE} · Marginal A330 {usd(opt.marginal_a330_value)} · A380 {usd(opt.marginal_a380_value)}
+            </p>
+            <ul className="mt-3 space-y-3 text-sm">
+              {opt.fleet_mix.length ? (
+                opt.fleet_mix.map((a, i) => <FleetLineDetail key={i} row={a} variant="optimized" />)
+              ) : (
+                <p className="text-sm text-zinc-500">No profitable mix in model</p>
+              )}
+            </ul>
+          </section>
+        </div>
+      </section>
     </div>
   );
 }
@@ -473,6 +426,24 @@ function Stat({
     <div className="rounded-lg border border-zinc-800/80 bg-black/20 p-3">
       <p className="text-[10px] uppercase tracking-widest text-zinc-500">{title}</p>
       <p className={highlight ? "mt-1 font-mono text-cyan-200" : "mt-1 font-mono text-zinc-200"}>{value}</p>
+    </div>
+  );
+}
+
+function MetricMini({
+  title,
+  value,
+  tone = "neutral",
+}: {
+  title: string;
+  value: string;
+  tone?: "neutral" | "good";
+}) {
+  const cls = tone === "good" ? "text-emerald-200/90" : "text-zinc-100";
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-wide text-zinc-500">{title}</p>
+      <p className={`mt-0.5 font-mono text-sm ${cls}`}>{value}</p>
     </div>
   );
 }
