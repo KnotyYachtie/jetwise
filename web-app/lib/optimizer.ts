@@ -8,7 +8,7 @@ import {
 import type { CurrentAircraftRow, Demand } from "./types";
 
 /** Maximum aircraft deployed per route in optimizer enumeration (n380 + n330 ≤ this). */
-export const MAX_AIRCRAFT_PER_ROUTE = 6;
+export const MAX_AIRCRAFT_PER_ROUTE = 8;
 /** Marginal “+1 hull” probe evaluates fleets up to this size (deploy cap + 1). */
 const MAX_AIRCRAFT_MARGINAL_PROBE = MAX_AIRCRAFT_PER_ROUTE + 1;
 
