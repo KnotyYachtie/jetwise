@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { JwCard } from "@/components/JwCard";
 import { api } from "@/lib/api-client";
 import { pct, usd } from "@/lib/format";
+import { MAX_AIRCRAFT_PER_ROUTE } from "@/lib/optimizer";
 
 type TripCostBreakdown = {
   fuel: number;
@@ -337,7 +338,7 @@ export default function RouteDetailPage() {
 
       <JwCard
         title="Marginal aircraft"
-        subtitle="Extra weekly profit if one more aircraft could be added profitably vs the optimized baseline (deploy cap 5 frames). Near zero means demand is saturated or the extra frame cannot earn positive marginal trips in this model."
+        subtitle={`Extra weekly profit if one more aircraft could be added profitably vs the optimized baseline (deploy cap ${MAX_AIRCRAFT_PER_ROUTE} frames). Near zero means demand is saturated or the extra frame cannot earn positive marginal trips in this model.`}
       >
         <p className="text-sm">
           A330: <span className="font-mono text-cyan-200">{usd(opt.marginal_a330_value)}</span> · A380:{" "}

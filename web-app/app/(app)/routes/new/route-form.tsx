@@ -6,6 +6,7 @@ import { AirportHubCombobox } from "@/components/AirportHubCombobox";
 import { JwCard } from "@/components/JwCard";
 import { api } from "@/lib/api-client";
 import { isValidHub } from "@/lib/hubs";
+import { MAX_AIRCRAFT_PER_ROUTE } from "@/lib/optimizer";
 
 type Ac = { type: "A380" | "A330"; y: string; j: string; f: string };
 
@@ -116,7 +117,9 @@ export default function RouteForm({ editId }: { editId?: string }) {
   }, [editId]);
 
   function addAircraft() {
-    setAircraft((a) => [...a, { type: "A380", y: "0", j: "0", f: "0" }]);
+    setAircraft((a) =>
+      a.length >= MAX_AIRCRAFT_PER_ROUTE ? a : [...a, { type: "A380", y: "0", j: "0", f: "0" }]
+    );
   }
 
   async function save() {
@@ -281,11 +284,15 @@ export default function RouteForm({ editId }: { editId?: string }) {
           ))}
           <button
             type="button"
+            disabled={aircraft.length >= MAX_AIRCRAFT_PER_ROUTE}
             onClick={addAircraft}
-            className="rounded-lg border border-cyan-500/30 px-3 py-2 text-sm text-cyan-200"
+            className="rounded-lg border border-cyan-500/30 px-3 py-2 text-sm text-cyan-200 disabled:cursor-not-allowed disabled:opacity-40"
           >
             + Add aircraft
           </button>
+          <p className="text-[10px] text-zinc-500">
+            Up to {MAX_AIRCRAFT_PER_ROUTE} aircraft per route (optimizer deploy cap).
+          </p>
         </div>
       </JwCard>
 

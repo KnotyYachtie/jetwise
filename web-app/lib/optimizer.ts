@@ -7,6 +7,11 @@ import {
 } from "./economics";
 import type { CurrentAircraftRow, Demand } from "./types";
 
+/** Maximum aircraft deployed per route in optimizer enumeration (n380 + n330 ≤ this). */
+export const MAX_AIRCRAFT_PER_ROUTE = 6;
+/** Marginal “+1 hull” probe evaluates fleets up to this size (deploy cap + 1). */
+const MAX_AIRCRAFT_MARGINAL_PROBE = MAX_AIRCRAFT_PER_ROUTE + 1;
+
 export type Config = { y: number; j: number; f: number };
 
 export type TripCostBreakdown = {
@@ -130,7 +135,7 @@ function evaluateComboCounts(
   company: Company,
   distance: number,
   demand: Demand,
-  maxPlanes = 4
+  maxPlanes = MAX_AIRCRAFT_PER_ROUTE
 ): { plan: FleetMixRow[]; total_profit_per_week: number; fulfilled: number } | null {
   const totalPlanes = n380 + n330;
   if (totalPlanes < 1 || totalPlanes > maxPlanes) return null;
@@ -180,7 +185,7 @@ function evaluateComboCountsEqualSplit(
   company: Company,
   distance: number,
   demand: Demand,
-  maxPlanes = 4
+  maxPlanes = MAX_AIRCRAFT_PER_ROUTE
 ): { plan: FleetMixRow[]; total_profit_per_week: number; fulfilled: number } | null {
   const totalPlanes = n380 + n330;
   if (totalPlanes < 1 || totalPlanes > maxPlanes) return null;
@@ -225,8 +230,15 @@ function evaluateOneExtraPlaneEqualSplit(
 ): number {
   const n380e = n380 + (extra === "A380" ? 1 : 0);
   const n330e = n330 + (extra === "A330" ? 1 : 0);
-  if (n380e + n330e > 5) return baselineWeeklyProfit;
-  const result = evaluateComboCountsEqualSplit(n380e, n330e, company, distance, demand, 5);
+  if (n380e + n330e > MAX_AIRCRAFT_MARGINAL_PROBE) return baselineWeeklyProfit;
+  const result = evaluateComboCountsEqualSplit(
+    n380e,
+    n330e,
+    company,
+    distance,
+    demand,
+    MAX_AIRCRAFT_MARGINAL_PROBE
+  );
   return result?.total_profit_per_week ?? baselineWeeklyProfit;
 }
 
@@ -245,7 +257,7 @@ function schedulingFromPlan(plan: FleetMixRow[]): SchedulingInfo {
 }
 
 /**
- * Backbone §10 — enumerate (n380,n330), 1..4 aircraft, pick max weekly profit.
+ * Backbone §10 — enumerate (n380,n330), 1..MAX_AIRCRAFT_PER_ROUTE aircraft, pick max weekly profit.
  */
 export function optimizeRoute(
   distance: number,
@@ -255,9 +267,9 @@ export function optimizeRoute(
   let best: { n380: number; n330: number; plan: FleetMixRow[]; total: number; fulfilled: number } | null =
     null;
 
-  for (let n380 = 0; n380 <= 4; n380++) {
-    for (let n330 = 0; n330 <= 4; n330++) {
-      if (n380 + n330 < 1 || n380 + n330 > 4) continue; // deploy cap: 4
+  for (let n380 = 0; n380 <= MAX_AIRCRAFT_PER_ROUTE; n380++) {
+    for (let n330 = 0; n330 <= MAX_AIRCRAFT_PER_ROUTE; n330++) {
+      if (n380 + n330 < 1 || n380 + n330 > MAX_AIRCRAFT_PER_ROUTE) continue;
       const r = evaluateComboCounts(n380, n330, company, distance, demand);
       if (!r) continue;
       if (!best || r.total_profit_per_week > best.total) {
