@@ -49,3 +49,5 @@ CREATE TABLE IF NOT EXISTS route_optimizations (
   calculated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   result_json JSONB NOT NULL
 );
+
+-- Optional: route composer airport search — run db/airport_lookup.sql in Neon when ready.

@@ -1,3 +1,5 @@
+import { formatAirportLine, regionNameFromIso2 } from "./location-labels";
+
 export type HubInfo = { icao: string; name: string; city: string; country: string };
 
 /** Backbone §3 */
@@ -16,4 +18,30 @@ export const HUB_ICAOS = new Set(HUBS.map((h) => h.icao));
 export function isValidHub(icao: string | null | undefined): boolean {
   if (!icao) return false;
   return HUB_ICAOS.has(icao.toUpperCase());
+}
+
+/** Alphabetical; empty query returns all hubs (for combobox). */
+export function filterHubsByQuery(q: string): HubInfo[] {
+  const sorted = [...HUBS].sort((a, b) => a.icao.localeCompare(b.icao));
+  const needle = q.trim().toLowerCase();
+  if (!needle) return sorted;
+  return sorted.filter((h) => {
+    const countryLong = regionNameFromIso2(h.country).toLowerCase();
+    return (
+      h.icao.toLowerCase().includes(needle) ||
+      h.name.toLowerCase().includes(needle) ||
+      h.city.toLowerCase().includes(needle) ||
+      h.country.toLowerCase().includes(needle) ||
+      countryLong.includes(needle)
+    );
+  });
+}
+
+export function formatHubLine(h: HubInfo): string {
+  return formatAirportLine({
+    icao: h.icao,
+    name: h.name,
+    countryIso2: h.country,
+    city: h.city,
+  });
 }

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { JwCard } from "@/components/JwCard";
 import { api } from "@/lib/api-client";
 import { usd } from "@/lib/format";
+import { formatHubLine } from "@/lib/hubs";
 
 type HubDetail = {
   hub: { icao: string; name: string; city: string; country: string };
@@ -50,9 +51,8 @@ export default function HubDetailPage() {
           ← Hubs
         </Link>
         <h1 className="mt-2 text-3xl font-semibold text-white">
-          {data.hub.icao} <span className="text-zinc-500">·</span> {data.hub.city}
+          {formatHubLine(data.hub)}
         </h1>
-        <p className="mt-1 text-sm text-zinc-500">{data.hub.name}</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

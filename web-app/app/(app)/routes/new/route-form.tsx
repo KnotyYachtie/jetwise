@@ -2,10 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { OriginHubCombobox } from "@/components/OriginHubCombobox";
 import { JwCard } from "@/components/JwCard";
 import { api } from "@/lib/api-client";
-
-const HUBS = ["KMIA", "KSPG", "KFLL", "KJFK", "YMML", "EDDF", "OMDB"] as const;
+import { isValidHub } from "@/lib/hubs";
 
 type Ac = { type: "A380" | "A330"; y: string; j: string; f: string };
 
@@ -14,7 +14,6 @@ export default function RouteForm({ editId }: { editId?: string }) {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [distance, setDistance] = useState("");
-  const [hub, setHub] = useState<string>(HUBS[0]!);
   const [demandY, setDemandY] = useState("0");
   const [demandJ, setDemandJ] = useState("0");
   const [demandF, setDemandF] = useState("0");
@@ -42,7 +41,6 @@ export default function RouteForm({ editId }: { editId?: string }) {
         setOrigin(r.origin);
         setDestination(r.destination);
         setDistance(String(r.distance));
-        setHub((r.hub as (typeof HUBS)[number] | null) || HUBS[0]!);
         setDemandY(String(r.demand.y));
         setDemandJ(String(r.demand.j));
         setDemandF(String(r.demand.f));
@@ -82,7 +80,7 @@ export default function RouteForm({ editId }: { editId?: string }) {
         origin,
         destination,
         distance: parseFloat(distance),
-        hub,
+        hub: isValidHub(origin) ? origin.toUpperCase() : null,
         demand_y: parseInt(demandY, 10) || 0,
         demand_j: parseInt(demandJ, 10) || 0,
         demand_f: parseInt(demandF, 10) || 0,
@@ -114,29 +112,19 @@ export default function RouteForm({ editId }: { editId?: string }) {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-semibold text-white">{editId ? "Edit route" : "New route"}</h1>
-        <p className="mt-1 text-sm text-zinc-500">Hub &amp; demand in Y/J/F — aircraft rows are sequential.</p>
+        <p className="mt-1 text-sm text-zinc-500">
+          Origin picks hub or research airport; fleet hub is set automatically when origin is a company hub.
+        </p>
       </div>
       {err ? <p className="text-sm text-orange-400">{err}</p> : null}
 
-      <JwCard title="Leg" subtitle="ICAO pair + great-circle distance (km)">
+      <JwCard title="Leg" subtitle="Great-circle distance (km); origin drives hub when it is a company hub">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Origin" value={origin} onChange={(v) => setOrigin(v.toUpperCase())} />
+          <div className="sm:col-span-2">
+            <OriginHubCombobox value={origin} onChange={setOrigin} />
+          </div>
           <Field label="Destination" value={destination} onChange={(v) => setDestination(v.toUpperCase())} />
           <Field label="Distance (km)" value={distance} onChange={setDistance} inputMode="decimal" />
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Hub</label>
-            <select
-              value={hub}
-              onChange={(e) => setHub(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-zinc-800 bg-black/50 px-3 py-2 text-sm text-white"
-            >
-              {HUBS.map((h) => (
-                <option key={h} value={h}>
-                  {h}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
       </JwCard>
 

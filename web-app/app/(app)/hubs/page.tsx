@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { JwCard } from "@/components/JwCard";
 import { api } from "@/lib/api-client";
 import { usd } from "@/lib/format";
+import { formatHubLine } from "@/lib/hubs";
 
 type HubRow = {
   icao: string;
@@ -51,7 +52,7 @@ export default function HubsPage() {
       <div className="grid gap-4 md:grid-cols-2">
         {data.hubs.map((h) => (
           <Link key={h.icao} href={`/hubs/${h.icao}`}>
-            <JwCard title={`${h.icao} — ${h.city}`} subtitle={h.name}>
+            <JwCard title={formatHubLine({ icao: h.icao, name: h.name, city: h.city, country: h.country })}>
               <dl className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <dt className="text-[10px] uppercase tracking-widest text-zinc-500">Routes</dt>
