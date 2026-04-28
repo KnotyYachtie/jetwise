@@ -186,8 +186,7 @@ optimized:
   scheduling:
     flight_time_hours:    number  — one-way flight time
     trips_per_week:       number  — actual weekly trips per aircraft
-    trip_bracket:         number  — which clean divisor this route falls into (2/day, 3/day, etc.)
-    threshold_proximity:  number  — minutes from next higher trip bracket
+    trip_bracket:         number  — rounded trips/day equivalent band (scheduling UI)
 ```
 
 ## Comparison Output (system calculated)

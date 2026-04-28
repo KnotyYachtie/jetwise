@@ -9,6 +9,7 @@
   --jw-muted: #71717a;
   --jw-accent: #22d3ee;
   --jw-warn: #fb923c;
+  --jw-orange-glow: rgba(251, 146, 60, 0.55);
 }
 
 @theme inline {
@@ -17,14 +18,55 @@
 }
 
 html {
-  background: radial-gradient(ellipse 120% 80% at 50% -20%, rgba(34, 211, 238, 0.14), transparent),
-    var(--jw-bg);
+  background: var(--jw-bg);
 }
 
 body {
   background: transparent;
   color: var(--jw-text);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/**
+ * Full-page backdrop: grows with route content (not viewport-fixed).
+ * Large radial “orb” washes + orange accents + seamlessly tiling vertical band (720px period).
+ */
+.jw-app-shell {
+  position: relative;
+  isolation: isolate;
+  background-color: var(--jw-bg);
+  overflow-x: clip;
+}
+
+.jw-app-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle 340px at 76% 14%, rgba(251, 146, 60, 0.12), transparent 68%),
+    radial-gradient(circle 380px at 14% 32%, rgba(34, 211, 238, 0.085), transparent 70%),
+    radial-gradient(circle 260px at 92% 62%, rgba(251, 146, 60, 0.055), transparent 72%),
+    radial-gradient(ellipse 115% 52% at 50% -12%, rgba(34, 211, 238, 0.13), transparent 56%),
+    radial-gradient(ellipse 95% 65% at 48% 118%, rgba(251, 146, 60, 0.065), transparent 58%);
+}
+
+.jw-app-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.55;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(34, 211, 238, 0.028) 0px,
+    transparent 220px,
+    transparent 500px,
+    rgba(251, 146, 60, 0.018) 720px,
+    rgba(34, 211, 238, 0.028) 720px
+  );
 }
 
 @keyframes jw-pulse {

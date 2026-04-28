@@ -56,29 +56,22 @@ export type SchedulingInfo = {
   flight_time_hours: number;
   trips_per_week: number;
   trip_bracket: number;
-  threshold_proximity_minutes: number;
 };
 
 export function schedulingAnalysis(
   flightTimeHours: number,
   tripsPerWeekVal: number
 ): SchedulingInfo {
-  const flight_time_minutes = flightTimeHours * 60;
   const trips_per_day_equivalent = tripsPerWeekVal / 7;
   const bracket = Math.max(
     1,
     Math.min(24, Math.round(trips_per_day_equivalent) || 1)
   );
-  const threshold_proximity_minutes =
-    flight_time_minutes > 0
-      ? Math.floor(MINUTES_PER_WEEK / (bracket + 1)) - flight_time_minutes
-      : 0;
 
   return {
     flight_time_hours: flightTimeHours,
     trips_per_week: tripsPerWeekVal,
     trip_bracket: bracket,
-    threshold_proximity_minutes,
   };
 }
 

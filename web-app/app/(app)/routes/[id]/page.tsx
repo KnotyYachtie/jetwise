@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { JwCard } from "@/components/JwCard";
 import { api } from "@/lib/api-client";
+import { shortenAirportHeadline } from "@/lib/airport-display-labels";
 import { pct, usd } from "@/lib/format";
 import { MAX_AIRCRAFT_PER_ROUTE } from "@/lib/optimizer";
 
@@ -34,6 +35,8 @@ type RouteRes = {
     id: string;
     origin: string;
     destination: string;
+    origin_airport_name?: string | null;
+    destination_airport_name?: string | null;
     distance: number;
     hub: string | null;
     demand: { y: number; j: number; f: number };
@@ -48,11 +51,10 @@ type RouteRes = {
       fleet_mix: FleetEconomicsRow[];
       marginal_a330_value: number;
       marginal_a380_value: number;
-      scheduling: {
+        scheduling: {
         flight_time_hours: number;
         trips_per_week: number;
         trip_bracket: number;
-        threshold_proximity_minutes: number;
       };
       total_profit_per_week: number;
       demand_fulfilled_optimized: number;
@@ -192,11 +194,27 @@ export default function RouteDetailPage() {
   const currentRankLabel = currentRank > 0 ? `#${currentRank}/${routeCount}` : "—";
   const optimizedRankLabel = optimizedRank > 0 ? `#${optimizedRank}/${routeCount}` : "—";
 
+  const originHeadline =
+    r.origin_airport_name != null && r.origin_airport_name !== ""
+      ? shortenAirportHeadline(r.origin_airport_name)
+      : null;
+  const destHeadline =
+    r.destination_airport_name != null && r.destination_airport_name !== ""
+      ? shortenAirportHeadline(r.destination_airport_name)
+      : null;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <p className="text-xs uppercase tracking-widest text-zinc-500">{r.hub ?? "Unassigned hub"}</p>
+          {originHeadline != null || destHeadline != null ? (
+            <p className="mt-2 text-sm leading-snug text-zinc-400">
+              <span className="text-zinc-300">{originHeadline ?? r.origin}</span>
+              <span className="mx-2 text-zinc-600">→</span>
+              <span className="text-zinc-300">{destHeadline ?? r.destination}</span>
+            </p>
+          ) : null}
           <h1 className="mt-1 font-mono text-2xl text-white">
             {r.origin} → {r.destination}
           </h1>
@@ -328,10 +346,10 @@ export default function RouteDetailPage() {
             Prices: Y {usd(r.prices.y)} · J {usd(r.prices.j)} · F {usd(r.prices.f)}
           </p>
         </JwCard>
-        <JwCard title="Scheduling pressure" subtitle="Useful for spotting under-rotated / over-long legs">
+        <JwCard title="Scheduling pressure" subtitle="Block time and rotation frequency (optimized aircraft)">
           <p className="text-sm text-zinc-300">
             One-way time {opt.scheduling.flight_time_hours.toFixed(2)}h · trips / wk {opt.scheduling.trips_per_week} ·
-            bracket {opt.scheduling.trip_bracket} · next threshold {opt.scheduling.threshold_proximity_minutes} min
+            bracket ~{opt.scheduling.trip_bracket}/day eq
           </p>
         </JwCard>
       </div>

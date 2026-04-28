@@ -51,8 +51,9 @@ export default function LoginInner() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-cyan-500/25 bg-[var(--jw-panel)] p-8 shadow-[0_0_100px_-30px_rgba(34,211,238,0.45)] backdrop-blur-xl">
+    <div className="jw-app-shell flex min-h-screen flex-col">
+      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-4">
+        <div className="w-full max-w-sm rounded-2xl border border-cyan-500/25 bg-[var(--jw-panel)] p-8 shadow-[0_0_100px_-28px_rgba(34,211,238,0.42),0_0_70px_-40px_rgba(251,146,60,0.15)] backdrop-blur-xl">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-3 h-3 w-3 rounded-full bg-cyan-400 shadow-[0_0_18px_rgba(34,211,238,0.9)]" />
           <h1 className="text-2xl font-semibold text-white">Jetwise</h1>
@@ -89,6 +90,7 @@ export default function LoginInner() {
         >
           {loading ? "…" : "Enter"}
         </button>
+        </div>
       </div>
     </div>
   );

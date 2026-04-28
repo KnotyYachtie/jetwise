@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { JwCard } from "@/components/JwCard";
+import { shortenAirportHeadline } from "@/lib/airport-display-labels";
 import { api } from "@/lib/api-client";
 import { usd } from "@/lib/format";
 
@@ -10,6 +11,8 @@ type RouteList = {
   id: string;
   origin: string;
   destination: string;
+  origin_airport_name?: string | null;
+  destination_airport_name?: string | null;
   distance: number;
   prices: { y: number; j: number; f: number };
   hub: string | null;
@@ -19,7 +22,6 @@ type RouteList = {
     scheduling: {
       trips_per_week: number;
       trip_bracket: number;
-      threshold_proximity_minutes: number;
     };
   };
   comparison: { delta_per_week: number };
@@ -106,9 +108,6 @@ export default function RoutesListPage() {
         {rows.map((r) => {
           const delta = r.comparison?.delta_per_week ?? 0;
           const sched = r.optimized.scheduling;
-          const warnBracket =
-            (sched?.threshold_proximity_minutes ?? 0) >= 0 &&
-            (sched?.threshold_proximity_minutes ?? 0) <= 30;
           return (
             <Link key={r.id} href={`/routes/${r.id}`}>
               <article className="rounded-2xl border border-zinc-800 bg-zinc-950/40 p-5 transition hover:border-cyan-500/35 hover:shadow-[0_0_40px_-12px_rgba(34,211,238,0.35)]">
@@ -120,6 +119,12 @@ export default function RoutesListPage() {
                     <p className="mt-1 font-mono text-lg text-white">
                       {r.origin} → {r.destination}
                     </p>
+                    {r.origin_airport_name || r.destination_airport_name ? (
+                      <p className="mt-1 text-xs text-zinc-500">
+                        {r.origin_airport_name ? shortenAirportHeadline(r.origin_airport_name) : r.origin} →{" "}
+                        {r.destination_airport_name ? shortenAirportHeadline(r.destination_airport_name) : r.destination}
+                      </p>
+                    ) : null}
                     <p className="mt-1 text-xs text-zinc-500">
                       {Math.round(r.distance)} km · bracket ~{sched?.trip_bracket ?? "—"}/day eq · trips/wk{" "}
                       {sched?.trips_per_week ?? "—"}
@@ -132,14 +137,9 @@ export default function RoutesListPage() {
                     </p>
                   </div>
                 </div>
-                <div className="mt-4 grid gap-3 border-t border-zinc-800 pt-4 text-sm sm:grid-cols-3">
+                <div className="mt-4 grid gap-3 border-t border-zinc-800 pt-4 text-sm sm:grid-cols-2">
                   <Stat label="Current / wk" value={usd(r.current?.weekly_profit_per_week ?? 0)} />
                   <Stat label="Optimized / wk" value={usd(r.optimized.total_profit_per_week)} />
-                  <Stat
-                    label="Bracket proximity"
-                    value={`${Math.round(sched?.threshold_proximity_minutes ?? 0)} min`}
-                    warn={warnBracket}
-                  />
                 </div>
                 <div className="mt-3 text-xs text-zinc-400">
                   Ticket prices · Y {usd(r.prices?.y ?? 0)} · J {usd(r.prices?.j ?? 0)} · F{" "}
@@ -162,11 +162,11 @@ export default function RoutesListPage() {
   );
 }
 
-function Stat({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-[10px] uppercase tracking-widest text-zinc-500">{label}</p>
-      <p className={warn ? "font-mono text-cyan-100" : "font-mono text-zinc-200"}>{value}</p>
+      <p className="font-mono text-zinc-200">{value}</p>
     </div>
   );
 }

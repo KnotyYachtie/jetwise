@@ -37,6 +37,9 @@ export type OptimizedApi = Omit<OptimizedRouteResult, "scheduling_summary"> & {
 };
 
 export type RoutePayload = DbRoute & {
+  /** Hub name or airport_lookup.name when available */
+  origin_airport_name?: string | null;
+  destination_airport_name?: string | null;
   demand: Demand;
   prices: TicketPrices;
   current: {

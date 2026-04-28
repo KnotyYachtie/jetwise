@@ -248,7 +248,6 @@ function schedulingFromPlan(plan: FleetMixRow[]): SchedulingInfo {
       flight_time_hours: 0,
       trips_per_week: 0,
       trip_bracket: 1,
-      threshold_proximity_minutes: 0,
     };
   }
   const minTrips = Math.min(...plan.map((p) => p.trips_per_week));

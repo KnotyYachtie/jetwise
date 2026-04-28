@@ -27,7 +27,7 @@ export function JwNav() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-cyan-500/20 bg-black/60 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-cyan-500/25 bg-black/55 shadow-[0_12px_48px_-28px_rgba(34,211,238,0.25),inset_0_-1px_0_0_rgba(251,146,60,0.12)] backdrop-blur-xl">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
         <div className="flex items-center gap-2">
           <div
