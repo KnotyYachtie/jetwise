@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AirportHubCombobox } from "@/components/AirportHubCombobox";
 import { JwCard } from "@/components/JwCard";
 import { api } from "@/lib/api-client";
@@ -13,7 +13,9 @@ export default function RouteForm({ editId }: { editId?: string }) {
   const router = useRouter();
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
-  const [distance, setDistance] = useState("");
+  /** Rounded great-circle km from `airport_lookup` + Haversine; `null` until computed or unusable pair. */
+  const [distanceKm, setDistanceKm] = useState<number | null>(null);
+  const [distanceLoading, setDistanceLoading] = useState(false);
   const [demandY, setDemandY] = useState("0");
   const [demandJ, setDemandJ] = useState("0");
   const [demandF, setDemandF] = useState("0");
@@ -23,20 +25,27 @@ export default function RouteForm({ editId }: { editId?: string }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [distanceNote, setDistanceNote] = useState<string | null>(null);
-  const skipAutoDistance = useRef(false);
-
-  useEffect(() => {
-    skipAutoDistance.current = false;
-  }, [origin, destination]);
 
   useEffect(() => {
     const o = origin.trim().toUpperCase();
     const d = destination.trim().toUpperCase();
-    if (o.length < 3 || d.length < 3 || o === d) {
+
+    if (o.length < 3 || d.length < 3) {
+      setDistanceKm(null);
       setDistanceNote(null);
+      setDistanceLoading(false);
       return;
     }
-    if (skipAutoDistance.current) return;
+
+    if (o === d) {
+      setDistanceKm(0);
+      setDistanceNote(null);
+      setDistanceLoading(false);
+      return;
+    }
+
+    setDistanceLoading(true);
+    setDistanceNote(null);
 
     const ac = new AbortController();
     const t = setTimeout(() => {
@@ -46,20 +55,24 @@ export default function RouteForm({ editId }: { editId?: string }) {
       )
         .then((r) => r.json() as Promise<{ roundedKm?: number; missing?: (string | null)[] }>)
         .then((body) => {
-          if (skipAutoDistance.current) return;
           if (typeof body.roundedKm === "number" && Number.isFinite(body.roundedKm)) {
-            setDistance(String(body.roundedKm));
+            setDistanceKm(body.roundedKm);
             setDistanceNote(null);
           } else {
+            setDistanceKm(null);
             const miss = (body.missing ?? []).filter(Boolean) as string[];
             setDistanceNote(
               miss.length
-                ? `No coordinates in the database for: ${miss.join(", ")}. Enter km manually or re-import airports.`
-                : "Could not compute distance — enter km manually."
+                ? `Missing coordinates in airport_lookup for: ${miss.join(", ")}.`
+                : "Could not compute distance."
             );
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          setDistanceKm(null);
+          setDistanceNote("Could not compute distance.");
+        })
+        .finally(() => setDistanceLoading(false));
     }, 400);
 
     return () => {
@@ -76,8 +89,6 @@ export default function RouteForm({ editId }: { editId?: string }) {
         const r = j.route as {
           origin: string;
           destination: string;
-          distance: number;
-          hub: string | null;
           demand: { y: number; j: number; f: number };
           technical_stop: string | null;
           notes: string | null;
@@ -85,7 +96,6 @@ export default function RouteForm({ editId }: { editId?: string }) {
         };
         setOrigin(r.origin);
         setDestination(r.destination);
-        setDistance(String(r.distance));
         setDemandY(String(r.demand.y));
         setDemandJ(String(r.demand.j));
         setDemandF(String(r.demand.f));
@@ -111,6 +121,11 @@ export default function RouteForm({ editId }: { editId?: string }) {
 
   async function save() {
     setErr(null);
+    if (distanceKm === null || !Number.isFinite(distanceKm)) {
+      setErr("Distance must be computed from origin and destination (both valid ICAOs with coordinates).");
+      return;
+    }
+
     setLoading(true);
     try {
       const assignments = aircraft.map((a) => ({
@@ -124,7 +139,7 @@ export default function RouteForm({ editId }: { editId?: string }) {
       const payload = {
         origin,
         destination,
-        distance: parseFloat(distance),
+        distance: distanceKm,
         hub: isValidHub(origin) ? origin.toUpperCase() : null,
         demand_y: parseInt(demandY, 10) || 0,
         demand_j: parseInt(demandJ, 10) || 0,
@@ -153,6 +168,8 @@ export default function RouteForm({ editId }: { editId?: string }) {
     }
   }
 
+  const canSave = distanceKm !== null && Number.isFinite(distanceKm) && !distanceLoading;
+
   return (
     <div className="space-y-6">
       <div>
@@ -165,7 +182,7 @@ export default function RouteForm({ editId }: { editId?: string }) {
 
       <JwCard
         title="Leg"
-        subtitle="Great-circle distance (km); origin drives hub when it is a company hub"
+        subtitle="Distance is great-circle km from airport coordinates (Haversine)"
         className="relative z-30"
       >
         <div className="grid gap-4 sm:grid-cols-2">
@@ -182,18 +199,20 @@ export default function RouteForm({ editId }: { editId?: string }) {
             />
           </div>
           <div className="sm:col-span-1">
-            <Field
-              label="Distance (km)"
-              value={distance}
-              onChange={(v) => {
-                skipAutoDistance.current = true;
-                setDistance(v);
-                setDistanceNote(null);
-              }}
-              inputMode="decimal"
-            />
+            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+              Distance (km)
+            </label>
+            <div className="mt-1 rounded-lg border border-zinc-800 bg-black/40 px-3 py-2 font-mono text-sm text-white">
+              {distanceLoading ? (
+                <span className="text-zinc-500">Calculating…</span>
+              ) : distanceKm !== null ? (
+                distanceKm
+              ) : (
+                <span className="text-zinc-600">—</span>
+              )}
+            </div>
             <p className="mt-1 text-[10px] text-zinc-600">
-              Auto-fills rounded great-circle distance when both ICAOs exist in <code className="text-zinc-500">airport_lookup</code> with coordinates. Edit the field to override and keep your value.
+              Computed automatically from coordinates in airport_lookup (rounded km).
             </p>
             {distanceNote ? <p className="mt-1 text-[10px] text-amber-500/90">{distanceNote}</p> : null}
           </div>
@@ -273,7 +292,7 @@ export default function RouteForm({ editId }: { editId?: string }) {
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
-          disabled={loading}
+          disabled={loading || !canSave}
           onClick={() => void save()}
           className="rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-5 py-2.5 text-sm font-bold uppercase tracking-widest text-cyan-100 disabled:opacity-40"
         >
