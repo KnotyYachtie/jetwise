@@ -41,6 +41,7 @@ export type RoutePayload = DbRoute & {
   prices: TicketPrices;
   current: {
     aircraft: CurrentAircraftRow[];
+    economics_rows: ReturnType<typeof evaluateCurrentAssignment>["plan"];
     notes: string | null;
     weekly_profit_per_week?: number;
     demand_fulfilled_pct?: number;
@@ -92,6 +93,7 @@ export function enrichRoute(
     prices,
     current: {
       aircraft,
+      economics_rows: cur.plan,
       notes: route.notes,
       weekly_profit_per_week: cur.total_profit_per_week,
       demand_fulfilled_pct: cur.fulfilled,

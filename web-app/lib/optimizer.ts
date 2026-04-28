@@ -14,7 +14,11 @@ export type FleetMixRow = {
   name: string;
   config: Config;
   trips_per_week: number;
+  flight_time_hours: number;
+  revenue_per_flight: number;
+  cost_per_flight: number;
   profit_per_flight: number;
+  profit_per_hour: number;
   profit_per_week: number;
   scheduling: SchedulingInfo;
 };
@@ -44,7 +48,12 @@ function toRow(ac: Aircraft, fe: FlightEconomics): FleetMixRow {
     name: ac.name,
     config: fe.config,
     trips_per_week: fe.trips_per_week,
+    flight_time_hours: fe.scheduling.flight_time_hours,
+    revenue_per_flight: fe.revenue_per_flight,
+    cost_per_flight: fe.cost_breakdown.total,
     profit_per_flight: fe.profit_per_flight,
+    profit_per_hour:
+      fe.scheduling.flight_time_hours > 0 ? fe.profit_per_flight / fe.scheduling.flight_time_hours : 0,
     profit_per_week: fe.profit_per_week,
     scheduling: fe.scheduling,
   };

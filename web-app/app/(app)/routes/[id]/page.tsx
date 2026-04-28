@@ -18,6 +18,17 @@ type RouteRes = {
     prices: { y: number; j: number; f: number };
     current: {
       aircraft: { type: string; config: { y: number; j: number; f: number } }[];
+      economics_rows: {
+        type: string;
+        config: { y: number; j: number; f: number };
+        trips_per_week: number;
+        flight_time_hours: number;
+        revenue_per_flight: number;
+        cost_per_flight: number;
+        profit_per_flight: number;
+        profit_per_hour: number;
+        profit_per_week: number;
+      }[];
       weekly_profit_per_week?: number;
       demand_fulfilled_pct?: number;
     };
@@ -26,7 +37,11 @@ type RouteRes = {
         type: string;
         config: { y: number; j: number; f: number };
         trips_per_week: number;
+        flight_time_hours: number;
+        revenue_per_flight: number;
+        cost_per_flight: number;
         profit_per_flight: number;
+        profit_per_hour: number;
         profit_per_week: number;
       }[];
       marginal_a330_value: number;
@@ -48,11 +63,18 @@ type RouteRes = {
   };
 };
 
+type RouteListBench = {
+  id: string;
+  current: { weekly_profit_per_week?: number };
+  optimized: { total_profit_per_week: number };
+};
+
 export default function RouteDetailPage() {
   const params = useParams();
   const id = String(params.id);
   const router = useRouter();
   const [data, setData] = useState<RouteRes | null>(null);
+  const [allRoutes, setAllRoutes] = useState<RouteListBench[]>([]);
   const [err, setErr] = useState<string | null>(null);
 
   async function load() {
@@ -60,6 +82,8 @@ export default function RouteDetailPage() {
     try {
       const j = await api<RouteRes>(`/api/routes/${id}`);
       setData(j);
+      const list = await api<{ routes: RouteListBench[] }>("/api/routes");
+      setAllRoutes(list.routes ?? []);
     } catch (e) {
       setErr((e as Error).message);
     }
@@ -91,6 +115,51 @@ export default function RouteDetailPage() {
   const r = data.route;
   const opt = r.optimized;
   const comp = r.comparison;
+  const currentRows = r.current.economics_rows ?? [];
+  const optimizedRows = opt.fleet_mix ?? [];
+
+  const currentRevenuePerWeek = currentRows.reduce(
+    (sum, row) => sum + row.revenue_per_flight * row.trips_per_week,
+    0
+  );
+  const currentCostPerWeek = currentRows.reduce(
+    (sum, row) => sum + row.cost_per_flight * row.trips_per_week,
+    0
+  );
+  const currentFlightHoursPerWeek = currentRows.reduce(
+    (sum, row) => sum + row.flight_time_hours * row.trips_per_week,
+    0
+  );
+  const currentProfitPerHour =
+    currentFlightHoursPerWeek > 0 ? (r.current.weekly_profit_per_week ?? 0) / currentFlightHoursPerWeek : 0;
+
+  const optimizedRevenuePerWeek = optimizedRows.reduce(
+    (sum, row) => sum + row.revenue_per_flight * row.trips_per_week,
+    0
+  );
+  const optimizedCostPerWeek = optimizedRows.reduce(
+    (sum, row) => sum + row.cost_per_flight * row.trips_per_week,
+    0
+  );
+  const optimizedFlightHoursPerWeek = optimizedRows.reduce(
+    (sum, row) => sum + row.flight_time_hours * row.trips_per_week,
+    0
+  );
+  const optimizedProfitPerHour =
+    optimizedFlightHoursPerWeek > 0 ? opt.total_profit_per_week / optimizedFlightHoursPerWeek : 0;
+  const configLeakPerWeek = (opt.total_profit_per_week ?? 0) - (r.current.weekly_profit_per_week ?? 0);
+
+  const sortableCurrent = allRoutes
+    .map((x) => ({ id: x.id, value: x.current?.weekly_profit_per_week ?? 0 }))
+    .sort((a, b) => b.value - a.value);
+  const sortableOptimized = allRoutes
+    .map((x) => ({ id: x.id, value: x.optimized?.total_profit_per_week ?? 0 }))
+    .sort((a, b) => b.value - a.value);
+  const currentRank = sortableCurrent.findIndex((x) => x.id === r.id) + 1;
+  const optimizedRank = sortableOptimized.findIndex((x) => x.id === r.id) + 1;
+  const routeCount = Math.max(allRoutes.length, 1);
+  const currentRankLabel = currentRank > 0 ? `#${currentRank}/${routeCount}` : "—";
+  const optimizedRankLabel = optimizedRank > 0 ? `#${optimizedRank}/${routeCount}` : "—";
 
   return (
     <div className="space-y-6">
@@ -126,50 +195,52 @@ export default function RouteDetailPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <JwCard title="Demand" subtitle="Y / J / F seat demand">
-          <p className="font-mono text-cyan-100">
-            Y {r.demand.y} · J {r.demand.j} · F {r.demand.f}
-          </p>
-        </JwCard>
-        <JwCard title="Ticket prices" subtitle="Backbone formula (per one-way seat)">
-          <p className="font-mono text-cyan-100">
-            Y {usd(r.prices.y)} · J {usd(r.prices.j)} · F {usd(r.prices.f)}
-          </p>
-        </JwCard>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-1">
-        <JwCard title="Comparison" subtitle="Current vs optimized (weekly)">
-          <dl className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-zinc-500">Current</dt>
-              <dd className="font-mono">{usd(r.current.weekly_profit_per_week ?? 0)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-zinc-500">Optimized</dt>
-              <dd className="font-mono text-emerald-300">{usd(opt.total_profit_per_week)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-zinc-500">Delta</dt>
-              <dd className="font-mono">{usd(comp.delta_per_week)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-zinc-500">Demand fulfilled</dt>
-              <dd className="font-mono">
-                {pct(comp.current_demand_fulfilled)} → {pct(comp.optimized_demand_fulfilled)}
-              </dd>
-            </div>
-          </dl>
-        </JwCard>
-      </div>
-
-      <JwCard title="Scheduling" subtitle="Bottleneck view (min trips in mix)">
-        <p className="text-sm text-zinc-300">
-          One-way time {opt.scheduling.flight_time_hours.toFixed(2)}h · trips / wk {opt.scheduling.trips_per_week} ·
-          bracket {opt.scheduling.trip_bracket} · next threshold {opt.scheduling.threshold_proximity_minutes} min
-        </p>
+      <JwCard title="Route economics (current input first)" subtitle="This is what your currently assigned aircraft mix is doing">
+        <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <Stat title="Revenue / wk" value={usd(currentRevenuePerWeek)} />
+          <Stat title="Cost / wk" value={usd(currentCostPerWeek)} />
+          <Stat title="Profit / wk" value={usd(r.current.weekly_profit_per_week ?? 0)} />
+          <Stat title="Profit / flight-hour" value={usd(currentProfitPerHour)} />
+        </div>
       </JwCard>
+
+      <JwCard title="Optimization opportunity" subtitle="How much weekly profit your current configuration is leaking">
+        <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <Stat title="Optimized profit / wk" value={usd(opt.total_profit_per_week)} />
+          <Stat title="Current config leak / wk" value={usd(configLeakPerWeek)} highlight />
+          <Stat title="Optimized profit / flight-hour" value={usd(optimizedProfitPerHour)} />
+          <Stat
+            title="Demand fulfilled"
+            value={`${pct(comp.current_demand_fulfilled)} → ${pct(comp.optimized_demand_fulfilled)}`}
+          />
+        </div>
+      </JwCard>
+
+      <JwCard title="Route competitiveness" subtitle="How this route ranks against the rest of your network">
+        <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <Stat title="Current profit rank" value={currentRankLabel} />
+          <Stat title="Optimized profit rank" value={optimizedRankLabel} />
+          <Stat title="Delta vs current" value={usd(comp.delta_per_week)} highlight />
+          <Stat title="Trips / week (optimized)" value={String(opt.scheduling.trips_per_week)} />
+        </div>
+      </JwCard>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <JwCard title="Demand + ticket model" subtitle="Inputs used by the economics model">
+          <p className="font-mono text-cyan-100">
+            Demand: Y {r.demand.y} · J {r.demand.j} · F {r.demand.f}
+          </p>
+          <p className="mt-2 font-mono text-zinc-300">
+            Prices: Y {usd(r.prices.y)} · J {usd(r.prices.j)} · F {usd(r.prices.f)}
+          </p>
+        </JwCard>
+        <JwCard title="Scheduling pressure" subtitle="Useful for spotting under-rotated / over-long legs">
+          <p className="text-sm text-zinc-300">
+            One-way time {opt.scheduling.flight_time_hours.toFixed(2)}h · trips / wk {opt.scheduling.trips_per_week} ·
+            bracket {opt.scheduling.trip_bracket} · next threshold {opt.scheduling.threshold_proximity_minutes} min
+          </p>
+        </JwCard>
+      </div>
 
       <JwCard title="Marginal aircraft" subtitle="Value of +1 frame on this leg (5-fleet analysis)">
         <p className="text-sm">
@@ -179,12 +250,18 @@ export default function RouteDetailPage() {
       </JwCard>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <JwCard title="Current assignment" subtitle="Sequentially served demand">
+        <JwCard title="Current assignment (your input)" subtitle="Shows where current config is subpar">
           <ul className="space-y-2 text-sm">
-            {r.current.aircraft.length ? (
-              r.current.aircraft.map((a, i) => (
+            {currentRows.length ? (
+              currentRows.map((a, i) => (
                 <li key={i} className="rounded-lg border border-zinc-800 bg-black/30 p-3 font-mono text-xs text-zinc-200">
-                  {a.type} — Y{a.config.y} J{a.config.j} F{a.config.f}
+                  <div>
+                    {a.type} — Y{a.config.y} J{a.config.j} F{a.config.f}
+                  </div>
+                  <div className="mt-1 text-zinc-400">
+                    {a.trips_per_week} trips/wk · rev {usd(a.revenue_per_flight)}/flt · cost{" "}
+                    {usd(a.cost_per_flight)}/flt · profit {usd(a.profit_per_hour)}/hr
+                  </div>
                 </li>
               ))
             ) : (
@@ -192,7 +269,7 @@ export default function RouteDetailPage() {
             )}
           </ul>
         </JwCard>
-        <JwCard title="Optimized mix" subtitle="Backbone fleet search (≤4)">
+        <JwCard title="Optimized mix (system recommendation)" subtitle="Profit-max route configuration while keeping aircraft hourly-profitable">
           <ul className="space-y-2 text-sm">
             {opt.fleet_mix.length ? (
               opt.fleet_mix.map((a, i) => (
@@ -204,7 +281,8 @@ export default function RouteDetailPage() {
                     {a.type} — Y{a.config.y} J{a.config.j} F{a.config.f}
                   </div>
                   <div className="mt-1 text-zinc-400">
-                    {a.trips_per_week} trips/wk · {usd(a.profit_per_week)}/wk
+                    {a.trips_per_week} trips/wk · rev {usd(a.revenue_per_flight)}/flt · cost{" "}
+                    {usd(a.cost_per_flight)}/flt · profit {usd(a.profit_per_hour)}/hr
                   </div>
                 </li>
               ))
@@ -214,6 +292,23 @@ export default function RouteDetailPage() {
           </ul>
         </JwCard>
       </div>
+    </div>
+  );
+}
+
+function Stat({
+  title,
+  value,
+  highlight = false,
+}: {
+  title: string;
+  value: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-zinc-800/80 bg-black/20 p-3">
+      <p className="text-[10px] uppercase tracking-widest text-zinc-500">{title}</p>
+      <p className={highlight ? "mt-1 font-mono text-cyan-200" : "mt-1 font-mono text-zinc-200"}>{value}</p>
     </div>
   );
 }
