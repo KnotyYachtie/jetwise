@@ -202,6 +202,10 @@ export default function RouteDetailPage() {
           <Stat title="Profit / wk" value={usd(r.current.weekly_profit_per_week ?? 0)} />
           <Stat title="Profit / flight-hour" value={usd(currentProfitPerHour)} />
         </div>
+        <p className="mt-3 text-[10px] text-zinc-500">
+          Profit is computed as <span className="font-mono text-zinc-400">revenue − cost</span> per flight, scaled by
+          trips/week (costs are non‑negative operating totals).
+        </p>
       </JwCard>
 
       <JwCard title="Optimization opportunity" subtitle="How much weekly profit your current configuration is leaking">

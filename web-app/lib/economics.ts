@@ -124,6 +124,11 @@ export function seats(c: Config): number {
   return c.y + c.j + c.f;
 }
 
+/** Clamp training sliders so multipliers cannot invert fuel/co2/repair costs (e.g. repair_training=100 → −repair before clamp). */
+function clampPct(x: number): number {
+  return Math.min(100, Math.max(0, x));
+}
+
 export function totalCostPerFlight(
   aircraft: Aircraft,
   company: Company,
@@ -131,23 +136,29 @@ export function totalCostPerFlight(
   config: Config,
   flightTimeHours: number
 ): { fuel: number; co2: number; acheck: number; repair: number; total: number } {
+  const ft = clampPct(company.fuel_training);
+  const ct = clampPct(company.co2_training);
+  const rt = clampPct(company.repair_training);
+
   const fuel_lbs =
-    (1 - company.fuel_training / 100) * distance * aircraft.fuel * (company.ci / 500 + 0.6);
-  const fuel_cost = (fuel_lbs * company.fuel_price) / 1000;
+    Math.max(0, 1 - ft / 100) * distance * aircraft.fuel * (company.ci / 500 + 0.6);
+  const fuel_cost = Math.max(0, (fuel_lbs * company.fuel_price) / 1000);
 
   const cap = capUnits(config);
   const s = seats(config);
   const co2_units =
-    (1 - company.co2_training / 100) *
+    Math.max(0, 1 - ct / 100) *
     (distance * aircraft.co2 * cap * company.load + s) *
     (company.ci / 2000 + 0.9);
-  const co2_cost = (co2_units * company.co2_price) / 1000;
+  const co2_cost = Math.max(0, (co2_units * company.co2_price) / 1000);
 
-  const acheck =
-    (aircraft.check_cost * Math.ceil(flightTimeHours)) / aircraft.maintenance_interval;
+  const acheck = Math.max(
+    0,
+    (aircraft.check_cost * Math.ceil(flightTimeHours)) / aircraft.maintenance_interval
+  );
 
-  const repair =
-    aircraft.purchase_cost * 0.0075 * (1 - (2 * company.repair_training) / 100);
+  const repair_mult = Math.max(0, 1 - (2 * rt) / 100);
+  const repair = Math.max(0, aircraft.purchase_cost * 0.0075 * repair_mult);
 
   const total = fuel_cost + co2_cost + acheck + repair;
   return { fuel: fuel_cost, co2: co2_cost, acheck, repair, total };
