@@ -99,6 +99,19 @@ function fleetTypeSummary(rows: FleetEconomicsRow[]): string {
   return [...m.entries()].map(([t, n]) => `${t}×${n}`).join(" · ") || "—";
 }
 
+function aircraftVariantLabel(type: string): string {
+  if (type === "A380") return "A380-800";
+  if (type === "A330") return "A330-800";
+  return type;
+}
+
+function usdKPerHour(n: number): string {
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  if (abs >= 1000) return `${sign}$${(abs / 1000).toFixed(1)}k / hr`;
+  return `${sign}${usd(abs, { maximumFractionDigits: 0 })} / hr`;
+}
+
 export default function RouteDetailPage() {
   const params = useParams();
   const id = String(params.id);
@@ -334,7 +347,14 @@ export default function RouteDetailPage() {
             <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Current assignment lines</p>
             <ul className="mt-3 space-y-3 text-sm">
               {currentRows.length ? (
-                currentRows.map((a, i) => <FleetLineDetail key={i} row={a} variant="muted" />)
+                currentRows.map((a, i) => (
+                  <FleetLineDetail
+                    key={i}
+                    row={a}
+                    variant="muted"
+                    title={`${aircraftVariantLabel(a.type)} ${r.origin}-${r.destination}-${i + 1}`}
+                  />
+                ))
               ) : (
                 <p className="text-sm text-zinc-500">No airframes assigned</p>
               )}
@@ -348,7 +368,14 @@ export default function RouteDetailPage() {
             </p>
             <ul className="mt-3 space-y-3 text-sm">
               {opt.fleet_mix.length ? (
-                opt.fleet_mix.map((a, i) => <FleetLineDetail key={i} row={a} variant="optimized" />)
+                opt.fleet_mix.map((a, i) => (
+                  <FleetLineDetail
+                    key={i}
+                    row={a}
+                    variant="optimized"
+                    title={`${aircraftVariantLabel(a.type)} ${r.origin}-${r.destination}-${i + 1}`}
+                  />
+                ))
               ) : (
                 <p className="text-sm text-zinc-500">No profitable mix in model</p>
               )}
@@ -379,18 +406,26 @@ function TripCostParts({
         <span className={`font-mono ${val}`}>{usd(bd.co2)}</span>
       </li>
       <li className="flex justify-between gap-3">
-        <span>A-check amort.</span>
+        <span>A-Check</span>
         <span className={`font-mono ${val}`}>{usd(bd.acheck)}</span>
       </li>
       <li className="flex justify-between gap-3">
-        <span>Repair reserve</span>
+        <span>Repair</span>
         <span className={`font-mono ${val}`}>{usd(bd.repair)}</span>
       </li>
     </ul>
   );
 }
 
-function FleetLineDetail({ row, variant }: { row: FleetEconomicsRow; variant: "muted" | "optimized" }) {
+function FleetLineDetail({
+  row,
+  variant,
+  title,
+}: {
+  row: FleetEconomicsRow;
+  variant: "muted" | "optimized";
+  title: string;
+}) {
   const wrap =
     variant === "optimized"
       ? "rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 text-cyan-50"
@@ -399,13 +434,14 @@ function FleetLineDetail({ row, variant }: { row: FleetEconomicsRow; variant: "m
   const bd = row.cost_breakdown;
   return (
     <li className={`${wrap} font-mono text-xs`}>
-      <div className="text-sm text-white/90">
-        {row.type} — Y{row.config.y} J{row.config.j} F{row.config.f}
+      <div className="text-sm text-white/90">{title}</div>
+      <div className="mt-1 text-zinc-300">
+        Y{row.config.y} J{row.config.j} F{row.config.f}
       </div>
       <div className={`mt-1 ${sub}`}>
-        {row.trips_per_week} trips/wk · {row.flight_time_hours.toFixed(2)}h block · {usd(row.profit_per_hour)}/hr
+        {row.trips_per_week} trips/wk · {row.flight_time_hours.toFixed(2)}h · {usdKPerHour(row.profit_per_hour)}
       </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+      <div className="mt-3 grid gap-3 sm:grid-cols-4">
         <div>
           <p className="text-[10px] uppercase tracking-wide text-zinc-500">Gross / trip</p>
           <p className="mt-0.5 font-mono text-sm text-zinc-100">{usd(row.revenue_per_flight)}</p>
@@ -421,6 +457,10 @@ function FleetLineDetail({ row, variant }: { row: FleetEconomicsRow; variant: "m
         <div>
           <p className="text-[10px] uppercase tracking-wide text-zinc-500">Net / trip</p>
           <p className="mt-0.5 font-mono text-sm text-emerald-200/90">{usd(row.profit_per_flight)}</p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-wide text-zinc-500">Net / week</p>
+          <p className="mt-0.5 font-mono text-sm text-emerald-200/90">{usd(row.profit_per_week)}</p>
         </div>
       </div>
     </li>
