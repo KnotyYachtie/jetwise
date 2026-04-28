@@ -17,6 +17,11 @@ export const metadata: Metadata = {
   title: "Jetwise",
   description: "Fleet and route optimization console",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-icon.svg",
+    shortcut: "/icon.svg",
+  },
   appleWebApp: {
     capable: true,
     title: "Jetwise",

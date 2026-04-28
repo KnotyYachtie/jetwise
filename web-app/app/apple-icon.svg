@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Jetwise app icon">
+  <defs>
+    <radialGradient id="bgGlow" cx="50%" cy="34%" r="72%">
+      <stop offset="0%" stop-color="#0f2533"/>
+      <stop offset="55%" stop-color="#071018"/>
+      <stop offset="100%" stop-color="#04070b"/>
+    </radialGradient>
+    <radialGradient id="cyanCore" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#8ef2ff" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#22d3ee" stop-opacity="0.15"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="220" fill="url(#bgGlow)"/>
+  <circle cx="512" cy="512" r="338" fill="none" stroke="#153445" stroke-width="10"/>
+  <circle cx="512" cy="512" r="270" fill="none" stroke="#12303f" stroke-width="4" stroke-dasharray="9 15" opacity="0.85"/>
+  <path d="M180 640 Q 520 320 860 462" fill="none" stroke="#fb923c" stroke-width="24" stroke-linecap="round"/>
+  <circle cx="306" cy="604" r="16" fill="#fb923c"/>
+  <circle cx="772" cy="480" r="16" fill="#fb923c"/>
+  <circle cx="512" cy="512" r="165" fill="url(#cyanCore)"/>
+  <circle cx="512" cy="512" r="130" fill="#031017" stroke="#22d3ee" stroke-opacity="0.52" stroke-width="4"/>
+  <path d="M512 355 L555 498 L705 498 L580 573 L624 705 L512 623 L400 705 L444 573 L319 498 L469 498 Z" fill="#22d3ee" fill-opacity="0.94"/>
+</svg>

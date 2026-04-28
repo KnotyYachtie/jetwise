@@ -12,10 +12,16 @@ export default function manifest(): MetadataRoute.Manifest {
     orientation: "any",
     icons: [
       {
-        src: "/globe.svg",
-        sizes: "512x512",
+        src: "/jetwise-icon.svg",
+        sizes: "any",
         type: "image/svg+xml",
         purpose: "any",
+      },
+      {
+        src: "/jetwise-icon.svg",
+        sizes: "any",
+        type: "image/svg+xml",
+        purpose: "maskable",
       },
     ],
   };
