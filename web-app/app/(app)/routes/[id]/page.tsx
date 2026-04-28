@@ -105,6 +105,12 @@ function aircraftVariantLabel(type: string): string {
   return type;
 }
 
+function aircraftFullName(type: string): string {
+  if (type === "A380") return "Airbus A380-800";
+  if (type === "A330") return "Airbus A330-800";
+  return type;
+}
+
 function usdKPerHour(n: number): string {
   const abs = Math.abs(n);
   const sign = n < 0 ? "-" : "";
@@ -345,7 +351,7 @@ export default function RouteDetailPage() {
 
           <section className="border-t border-zinc-800/80 pt-5">
             <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Current assignment lines</p>
-            <ul className="mt-3 space-y-3 text-sm">
+            <ul className="mt-3 grid grid-cols-2 gap-2 text-sm">
               {currentRows.length ? (
                 currentRows.map((a, i) => (
                   <FleetLineDetail
@@ -353,6 +359,8 @@ export default function RouteDetailPage() {
                     row={a}
                     variant="muted"
                     title={`${aircraftVariantLabel(a.type)} ${r.origin}-${r.destination}-${i + 1}`}
+                    subtitle={aircraftFullName(a.type)}
+                    prices={r.prices}
                   />
                 ))
               ) : (
@@ -366,7 +374,7 @@ export default function RouteDetailPage() {
             <p className="mt-1 text-xs text-zinc-400">
               {fleetTypeSummary(optimizedRows)} · Deploy cap {MAX_AIRCRAFT_PER_ROUTE} · Marginal A330 {usd(opt.marginal_a330_value)} · A380 {usd(opt.marginal_a380_value)}
             </p>
-            <ul className="mt-3 space-y-3 text-sm">
+            <ul className="mt-3 grid grid-cols-2 gap-2 text-sm">
               {opt.fleet_mix.length ? (
                 opt.fleet_mix.map((a, i) => (
                   <FleetLineDetail
@@ -374,6 +382,8 @@ export default function RouteDetailPage() {
                     row={a}
                     variant="optimized"
                     title={`${aircraftVariantLabel(a.type)} ${r.origin}-${r.destination}-${i + 1}`}
+                    subtitle={aircraftFullName(a.type)}
+                    prices={r.prices}
                   />
                 ))
               ) : (
@@ -421,46 +431,55 @@ function FleetLineDetail({
   row,
   variant,
   title,
+  subtitle,
+  prices,
 }: {
   row: FleetEconomicsRow;
   variant: "muted" | "optimized";
   title: string;
+  subtitle: string;
+  prices: { y: number; j: number; f: number };
 }) {
   const wrap =
     variant === "optimized"
-      ? "rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 text-cyan-50"
-      : "rounded-lg border border-zinc-800 bg-black/30 p-3 text-zinc-200";
+      ? "rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-2.5 text-cyan-50"
+      : "rounded-lg border border-zinc-800 bg-black/30 p-2.5 text-zinc-200";
   const sub = "text-zinc-400";
   const bd = row.cost_breakdown;
   return (
     <li className={`${wrap} font-mono text-xs`}>
-      <div className="text-sm text-white/90">{title}</div>
-      <div className="mt-1 text-zinc-300">
+      <div className="text-[13px] leading-snug text-white/90">{title}</div>
+      <div className="mt-0.5 text-[11px] text-zinc-400">{subtitle}</div>
+      <div className="mt-1 text-[11px] text-zinc-300">
         Y{row.config.y} J{row.config.j} F{row.config.f}
       </div>
-      <div className={`mt-1 ${sub}`}>
-        {row.trips_per_week} trips/wk · {row.flight_time_hours.toFixed(2)}h · {usdKPerHour(row.profit_per_hour)}
+      <div className="mt-0.5 text-[10px] text-zinc-500">
+        Ticket prices Y {usd(prices.y)} · J {usd(prices.j)} · F {usd(prices.f)}
       </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-4">
+      <div className={`mt-1 text-[11px] ${sub}`}>
+        {row.trips_per_week} t/wk · {row.flight_time_hours.toFixed(2)}h · {usdKPerHour(row.profit_per_hour)}
+      </div>
+      <div className="mt-2 grid gap-2">
         <div>
           <p className="text-[10px] uppercase tracking-wide text-zinc-500">Gross / trip</p>
-          <p className="mt-0.5 font-mono text-sm text-zinc-100">{usd(row.revenue_per_flight)}</p>
+          <p className="mt-0.5 font-mono text-[13px] text-zinc-100">{usd(row.revenue_per_flight)}</p>
         </div>
         <div>
           <p className="text-[10px] uppercase tracking-wide text-zinc-500">Cost / trip</p>
-          <p className="mt-0.5 font-mono text-sm">{usd(row.cost_per_flight)}</p>
-          <TripCostParts
-            bd={{ fuel: bd.fuel, co2: bd.co2, acheck: bd.acheck, repair: bd.repair }}
-            accent={variant === "optimized" ? "cyan" : "zinc"}
-          />
+          <p className="mt-0.5 font-mono text-[13px]">{usd(row.cost_per_flight)}</p>
+          <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
+            Fuel {usd(bd.fuel)} · CO₂ {usd(bd.co2)} · A-Check {usd(bd.acheck)} · Repair {usd(bd.repair)}
+          </p>
         </div>
-        <div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
           <p className="text-[10px] uppercase tracking-wide text-zinc-500">Net / trip</p>
-          <p className="mt-0.5 font-mono text-sm text-emerald-200/90">{usd(row.profit_per_flight)}</p>
-        </div>
-        <div>
+            <p className="mt-0.5 font-mono text-[13px] text-emerald-200/90">{usd(row.profit_per_flight)}</p>
+          </div>
+          <div>
           <p className="text-[10px] uppercase tracking-wide text-zinc-500">Net / week</p>
-          <p className="mt-0.5 font-mono text-sm text-emerald-200/90">{usd(row.profit_per_week)}</p>
+            <p className="mt-0.5 font-mono text-[13px] text-emerald-200/90">{usd(row.profit_per_week)}</p>
+          </div>
         </div>
       </div>
     </li>
