@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { JwCard } from "@/components/JwCard";
 import { shortenAirportHeadline } from "@/lib/airport-display-labels";
 import { api } from "@/lib/api-client";
+import { MINUTES_PER_WEEK } from "@/lib/economics";
 import { usd } from "@/lib/format";
 
 type RouteList = {
@@ -28,6 +29,30 @@ type RouteList = {
 };
 
 type Res = { routes: RouteList[] };
+
+const HOURS_PER_WEEK = MINUTES_PER_WEEK / 60;
+
+function weeklyToPerHour(weekly: number): number {
+  return weekly / HOURS_PER_WEEK;
+}
+
+/** Dense rank: tied values share the same rank; next distinct value gets the next rank (1,1,2,…). */
+function denseRankByRoute<T extends { id: string }>(
+  routes: T[],
+  score: (r: T) => number
+): Map<string, number> {
+  const sorted = [...routes].sort((a, b) => score(b) - score(a));
+  const map = new Map<string, number>();
+  let rank = 0;
+  let prev: number | undefined;
+  for (const r of sorted) {
+    const v = score(r);
+    if (prev === undefined || v !== prev) rank += 1;
+    prev = v;
+    map.set(r.id, rank);
+  }
+  return map;
+}
 
 export default function RoutesListPage() {
   const [data, setData] = useState<Res | null>(null);
@@ -77,6 +102,14 @@ export default function RoutesListPage() {
     (a, b) => (b.comparison?.delta_per_week ?? 0) - (a.comparison?.delta_per_week ?? 0)
   );
 
+  const total = data.routes.length;
+  const currentRankById = denseRankByRoute(data.routes, (r) =>
+    weeklyToPerHour(r.current?.weekly_profit_per_week ?? 0)
+  );
+  const optimizedRankById = denseRankByRoute(data.routes, (r) =>
+    weeklyToPerHour(r.optimized.total_profit_per_week)
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
@@ -108,6 +141,8 @@ export default function RoutesListPage() {
         {rows.map((r) => {
           const delta = r.comparison?.delta_per_week ?? 0;
           const sched = r.optimized.scheduling;
+          const curHr = weeklyToPerHour(r.current?.weekly_profit_per_week ?? 0);
+          const optHr = weeklyToPerHour(r.optimized.total_profit_per_week);
           return (
             <Link key={r.id} href={`/routes/${r.id}`}>
               <article className="rounded-2xl border border-zinc-800 bg-zinc-950/40 p-5 transition hover:border-cyan-500/35 hover:shadow-[0_0_40px_-12px_rgba(34,211,238,0.35)]">
@@ -140,6 +175,16 @@ export default function RoutesListPage() {
                 <div className="mt-4 grid gap-3 border-t border-zinc-800 pt-4 text-sm sm:grid-cols-2">
                   <Stat label="Current / wk" value={usd(r.current?.weekly_profit_per_week ?? 0)} />
                   <Stat label="Optimized / wk" value={usd(r.optimized.total_profit_per_week)} />
+                  <Stat
+                    label="Current / hr"
+                    value={usd(curHr, { maximumFractionDigits: 0 })}
+                    meta={total > 0 ? `${currentRankById.get(r.id) ?? "—"}/${total}` : undefined}
+                  />
+                  <Stat
+                    label="Optimized / hr"
+                    value={usd(optHr, { maximumFractionDigits: 0 })}
+                    meta={total > 0 ? `${optimizedRankById.get(r.id) ?? "—"}/${total}` : undefined}
+                  />
                 </div>
                 <div className="mt-3 text-xs text-zinc-400">
                   Ticket prices · Y {usd(r.prices?.y ?? 0)} · J {usd(r.prices?.j ?? 0)} · F{" "}
@@ -162,11 +207,12 @@ export default function RoutesListPage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, meta }: { label: string; value: string; meta?: string }) {
   return (
     <div>
       <p className="text-[10px] uppercase tracking-widest text-zinc-500">{label}</p>
       <p className="font-mono text-zinc-200">{value}</p>
+      {meta ? <p className="mt-0.5 font-mono text-xs text-zinc-500">({meta})</p> : null}
     </div>
   );
 }
