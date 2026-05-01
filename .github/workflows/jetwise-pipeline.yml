@@ -1,0 +1,157 @@
+# Runs Jetwise suggestion pipeline against production (or staging) Postgres.
+# Vercel cannot run Polars/long jobs — this workflow runs on Ubuntu runners instead.
+#
+# Required repo secret:
+#   POSTGRES_URL — same pooled Postgres URL as Vercel (Neon / Vercel Postgres).
+#
+# Provide ONE data secret depending on workflow mode:
+#   full             → JETWISE_PIPELINE_DATA_TAR_URL — HTTPS URL to .tar.gz whose entries include:
+#                       airports.parquet, long_airports.parquet, routes.parquet (paths may include a top-level folder)
+#   directional-only → JETWISE_DIRECTIONAL_PARQUET_URL — final_routes_directional.parquet
+#   csv-only         → JETWISE_HUB_SEED_CSV_URL — hub_suggestions_seed.csv (no Python rebuild)
+#
+# Optional repository variable:
+#   IMPORT_SUGGESTIONS_LIMIT — passed through .env.local (script default 150)
+#   PIPELINE_SCHEDULE_MODE — scheduled runs only: directional-only | csv-only | full (default directional-only)
+
+name: Jetwise pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Pipeline mode
+        type: choice
+        required: true
+        default: directional-only
+        options:
+          - full
+          - directional-only
+          - csv-only
+  schedule:
+    - cron: "0 7 * * 1"
+
+concurrency:
+  group: jetwise-pipeline-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve mode
+        id: mode
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_MODE: ${{ github.event.inputs.mode }}
+          SCHEDULE_MODE: ${{ vars.PIPELINE_SCHEDULE_MODE }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "value=${INPUT_MODE}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${SCHEDULE_MODE:-directional-only}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate secrets
+        shell: bash
+        env:
+          MODE: ${{ steps.mode.outputs.value }}
+          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+          TAR_URL: ${{ secrets.JETWISE_PIPELINE_DATA_TAR_URL }}
+          DIR_URL: ${{ secrets.JETWISE_DIRECTIONAL_PARQUET_URL }}
+          CSV_URL: ${{ secrets.JETWISE_HUB_SEED_CSV_URL }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${POSTGRES_URL:-}" ]]; then
+            echo "::error::Set repository secret POSTGRES_URL"
+            exit 1
+          fi
+          case "$MODE" in
+            full)
+              [[ -n "${TAR_URL:-}" ]] || { echo "::error::full mode needs JETWISE_PIPELINE_DATA_TAR_URL"; exit 1; }
+              ;;
+            directional-only)
+              [[ -n "${DIR_URL:-}" ]] || { echo "::error::directional-only needs JETWISE_DIRECTIONAL_PARQUET_URL"; exit 1; }
+              ;;
+            csv-only)
+              [[ -n "${CSV_URL:-}" ]] || { echo "::error::csv-only needs JETWISE_HUB_SEED_CSV_URL"; exit 1; }
+              ;;
+            *)
+              echo "::error::Unknown mode: $MODE"; exit 1
+              ;;
+          esac
+
+      - uses: actions/setup-python@v5
+        if: steps.mode.outputs.value != 'csv-only'
+        with:
+          python-version: "3.12"
+
+      - name: Python venv + Polars
+        if: steps.mode.outputs.value != 'csv-only'
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install -U pip polars
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web-app/package-lock.json
+
+      - name: Install web-app dependencies
+        working-directory: web-app
+        run: npm ci
+
+      - name: Write web-app/.env.local
+        working-directory: web-app
+        env:
+          POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+          IMPORT_SUGGESTIONS_LIMIT: ${{ vars.IMPORT_SUGGESTIONS_LIMIT }}
+        run: |
+          set -euo pipefail
+          {
+            echo "POSTGRES_URL=${POSTGRES_URL}"
+            if [[ -n "${IMPORT_SUGGESTIONS_LIMIT:-}" ]]; then
+              echo "IMPORT_SUGGESTIONS_LIMIT=${IMPORT_SUGGESTIONS_LIMIT}"
+            fi
+          } > .env.local
+
+      - name: Full pipeline (build_routes → export_hub_seed → import)
+        if: steps.mode.outputs.value == 'full'
+        env:
+          TAR_URL: ${{ secrets.JETWISE_PIPELINE_DATA_TAR_URL }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/Downloads"
+          curl -fsSL "$TAR_URL" -o /tmp/jetwise-parquet.tar.gz
+          # Tarball must extract so these paths exist: ~/Downloads/airports.parquet,
+          # ~/Downloads/long_airports.parquet, ~/Downloads/routes.parquet
+          tar -xzf /tmp/jetwise-parquet.tar.gz -C "$HOME/Downloads"
+          chmod +x run_pipeline.sh || true
+          bash run_pipeline.sh
+
+      - name: Directional parquet → CSV → import
+        if: steps.mode.outputs.value == 'directional-only'
+        env:
+          DIR_URL: ${{ secrets.JETWISE_DIRECTIONAL_PARQUET_URL }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/Downloads"
+          curl -fsSL "$DIR_URL" -o "$HOME/Downloads/final_routes_directional.parquet"
+          .venv/bin/python export_hub_seed.py
+          cd web-app
+          npm run import-suggestions
+
+      - name: Hub CSV → import only
+        if: steps.mode.outputs.value == 'csv-only'
+        env:
+          CSV_URL: ${{ secrets.JETWISE_HUB_SEED_CSV_URL }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/Downloads"
+          curl -fsSL "$CSV_URL" -o "$HOME/Downloads/hub_suggestions_seed.csv"
+          cd web-app
+          npm run import-suggestions
