@@ -4,13 +4,29 @@
 # Required repo secret:
 #   POSTGRES_URL — same pooled Postgres URL as Vercel (Neon / Vercel Postgres).
 #
-# Provide ONE data secret depending on workflow mode:
-#   full             → JETWISE_PIPELINE_DATA_TAR_URL — HTTPS URL to .tar.gz that extracts so these exist:
-#                       ~/Downloads/airports.parquet, ~/Downloads/long_airports.parquet, ~/Downloads/routes.parquet
-#   directional-only → JETWISE_DIRECTIONAL_PARQUET_URL — final_routes_directional.parquet
-#   csv-only         → JETWISE_HUB_SEED_CSV_URL — hub_suggestions_seed.csv (no Python rebuild)
+# Data inputs — pick ONE approach per mode:
 #
-# Optional repository variable:
+# (A) GitHub Releases (recommended)
+#   Set repository variable PIPELINE_DATA_RELEASE_TAG to a tag that exists on THIS repo
+#   (e.g. pipeline-data-2026-05-01). Attach assets with EXACT filenames:
+#     full             → jetwise-parquet.tar.gz  (extracts to ~/Downloads/*.parquet as below)
+#     directional-only → final_routes_directional.parquet
+#     csv-only         → hub_suggestions_seed.csv
+#   Workflow uses `gh release download` + GITHUB_TOKEN (works for private repos).
+#
+#   Creating a release (click-path summary):
+#     Releases → Draft release → choose tag / create tag → attach files → Publish.
+#
+# (B) Raw HTTPS URL secrets (any host, including public Release CDN URLs)
+#   full             → JETWISE_PIPELINE_DATA_TAR_URL — .tar.gz → ~/Downloads/airports.parquet,
+#                       long_airports.parquet, routes.parquet
+#   directional-only → JETWISE_DIRECTIONAL_PARQUET_URL
+#   csv-only         → JETWISE_HUB_SEED_CSV_URL
+#
+#   Public Release asset URL shape (optional instead of(A)):
+#     https://github.com/OWNER/REPO/releases/download/<TAG>/<filename>
+#
+# Optional repository variables:
 #   IMPORT_SUGGESTIONS_LIMIT — passed through .env.local (script default 150)
 #   PIPELINE_SCHEDULE_MODE — scheduled runs only: directional-only | csv-only | full (default directional-only)
 
@@ -38,6 +54,10 @@ concurrency:
 jobs:
   pipeline:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
 
@@ -60,6 +80,7 @@ jobs:
         env:
           MODE: ${{ steps.mode.outputs.value }}
           POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+          RELEASE_TAG: ${{ vars.PIPELINE_DATA_RELEASE_TAG }}
           TAR_URL: ${{ secrets.JETWISE_PIPELINE_DATA_TAR_URL }}
           DIR_URL: ${{ secrets.JETWISE_DIRECTIONAL_PARQUET_URL }}
           CSV_URL: ${{ secrets.JETWISE_HUB_SEED_CSV_URL }}
@@ -69,15 +90,27 @@ jobs:
             echo "::error::Set repository secret POSTGRES_URL"
             exit 1
           fi
+          has_rel=0
+          [[ -n "${RELEASE_TAG:-}" ]] && has_rel=1
+
           case "$MODE" in
             full)
-              [[ -n "${TAR_URL:-}" ]] || { echo "::error::full mode needs JETWISE_PIPELINE_DATA_TAR_URL"; exit 1; }
+              if [[ "$has_rel" -eq 0 ]] && [[ -z "${TAR_URL:-}" ]]; then
+                echo "::error::full mode: set repository variable PIPELINE_DATA_RELEASE_TAG (GitHub Release with jetwise-parquet.tar.gz) or secret JETWISE_PIPELINE_DATA_TAR_URL"
+                exit 1
+              fi
               ;;
             directional-only)
-              [[ -n "${DIR_URL:-}" ]] || { echo "::error::directional-only needs JETWISE_DIRECTIONAL_PARQUET_URL"; exit 1; }
+              if [[ "$has_rel" -eq 0 ]] && [[ -z "${DIR_URL:-}" ]]; then
+                echo "::error::directional-only: set PIPELINE_DATA_RELEASE_TAG or JETWISE_DIRECTIONAL_PARQUET_URL"
+                exit 1
+              fi
               ;;
             csv-only)
-              [[ -n "${CSV_URL:-}" ]] || { echo "::error::csv-only needs JETWISE_HUB_SEED_CSV_URL"; exit 1; }
+              if [[ "$has_rel" -eq 0 ]] && [[ -z "${CSV_URL:-}" ]]; then
+                echo "::error::csv-only: set PIPELINE_DATA_RELEASE_TAG or JETWISE_HUB_SEED_CSV_URL"
+                exit 1
+              fi
               ;;
             *)
               echo "::error::Unknown mode: $MODE"; exit 1
@@ -122,13 +155,17 @@ jobs:
       - name: Full pipeline (build_routes → export_hub_seed → import)
         if: steps.mode.outputs.value == 'full'
         env:
+          RELEASE_TAG: ${{ vars.PIPELINE_DATA_RELEASE_TAG }}
           TAR_URL: ${{ secrets.JETWISE_PIPELINE_DATA_TAR_URL }}
         run: |
           set -euo pipefail
           mkdir -p "$HOME/Downloads"
-          curl -fsSL "$TAR_URL" -o /tmp/jetwise-parquet.tar.gz
-          # Tarball must extract so these paths exist: ~/Downloads/airports.parquet,
-          # ~/Downloads/long_airports.parquet, ~/Downloads/routes.parquet
+          if [[ -n "${RELEASE_TAG:-}" ]]; then
+            gh release download "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" \
+              -p "jetwise-parquet.tar.gz" -O /tmp/jetwise-parquet.tar.gz
+          else
+            curl -fsSL "${TAR_URL}" -o /tmp/jetwise-parquet.tar.gz
+          fi
           tar -xzf /tmp/jetwise-parquet.tar.gz -C "$HOME/Downloads"
           chmod +x run_pipeline.sh || true
           bash run_pipeline.sh
@@ -136,11 +173,18 @@ jobs:
       - name: Directional parquet → CSV → import
         if: steps.mode.outputs.value == 'directional-only'
         env:
+          RELEASE_TAG: ${{ vars.PIPELINE_DATA_RELEASE_TAG }}
           DIR_URL: ${{ secrets.JETWISE_DIRECTIONAL_PARQUET_URL }}
         run: |
           set -euo pipefail
           mkdir -p "$HOME/Downloads"
-          curl -fsSL "$DIR_URL" -o "$HOME/Downloads/final_routes_directional.parquet"
+          if [[ -n "${RELEASE_TAG:-}" ]]; then
+            gh release download "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" \
+              -p "final_routes_directional.parquet" \
+              -O "$HOME/Downloads/final_routes_directional.parquet"
+          else
+            curl -fsSL "${DIR_URL}" -o "$HOME/Downloads/final_routes_directional.parquet"
+          fi
           .venv/bin/python export_hub_seed.py
           cd web-app
           npm run import-suggestions
@@ -148,10 +192,17 @@ jobs:
       - name: Hub CSV → import only
         if: steps.mode.outputs.value == 'csv-only'
         env:
+          RELEASE_TAG: ${{ vars.PIPELINE_DATA_RELEASE_TAG }}
           CSV_URL: ${{ secrets.JETWISE_HUB_SEED_CSV_URL }}
         run: |
           set -euo pipefail
           mkdir -p "$HOME/Downloads"
-          curl -fsSL "$CSV_URL" -o "$HOME/Downloads/hub_suggestions_seed.csv"
+          if [[ -n "${RELEASE_TAG:-}" ]]; then
+            gh release download "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" \
+              -p "hub_suggestions_seed.csv" \
+              -O "$HOME/Downloads/hub_suggestions_seed.csv"
+          else
+            curl -fsSL "${CSV_URL}" -o "$HOME/Downloads/hub_suggestions_seed.csv"
+          fi
           cd web-app
           npm run import-suggestions
