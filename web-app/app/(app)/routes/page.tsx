@@ -170,12 +170,7 @@ export default function RoutesListPage() {
                       {sched?.trips_per_week ?? "—"}
                     </p>
                   </div>
-                  <div className="flex shrink-0 flex-row items-start gap-4 sm:gap-5">
-                    <RouteRevenueEfficiencyRing
-                      currentWeekly={curWk}
-                      optimizedWeekly={optWk}
-                      label={`${r.origin} → ${r.destination}`}
-                    />
+                  <div className="flex shrink-0 flex-col items-end gap-3 sm:gap-3.5">
                     <div className="text-right">
                       <p className="text-[10px] uppercase tracking-widest text-zinc-500">Δ optimized − current</p>
                       <p
@@ -186,6 +181,11 @@ export default function RoutesListPage() {
                         {usd(delta)}
                       </p>
                     </div>
+                    <RouteRevenueEfficiencyRing
+                      currentWeekly={curWk}
+                      optimizedWeekly={optWk}
+                      label={`${r.origin} → ${r.destination}`}
+                    />
                   </div>
                 </div>
                 <div className="mt-4 grid gap-3 border-t border-zinc-800 pt-4 text-sm sm:grid-cols-2">

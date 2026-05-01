@@ -15,14 +15,14 @@
   --jw-accent: #22d3ee;
   --jw-warn: #fb923c;
   --jw-orange-glow: rgba(251, 146, 60, 0.55);
-  /* 3D globe (r3f-globe) — mirror numeric values in lib/jw-design-tokens.ts */
+  /* 3D globe (Aceternity-style three-globe) — mirror tokens in lib/jw-design-tokens.ts */
   --jw-globe-base: #040c12;
   --jw-globe-emissive: #062a32;
   --jw-globe-emissive-intensity: 0.55;
   --jw-globe-atmosphere: #22d3ee;
   --jw-globe-atmosphere-altitude: 0.18;
   --jw-globe-arc: #22d3ee;
-  /* GeoJSON land overlay (`public/globe/globe.json`) — caps / stroke */
+  /* GeoJSON land (bundled `data/globe.json`, Aceternity-style hex overlay) */
   --jw-globe-land-cap: rgba(34, 211, 238, 0.07);
   --jw-globe-land-side: rgba(4, 18, 24, 0.4);
   --jw-globe-land-stroke: rgba(34, 211, 238, 0.22);
