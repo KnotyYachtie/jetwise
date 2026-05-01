@@ -69,7 +69,10 @@ export function enrichRoute(
     f: route.demand_f,
   };
 
-  const aircraft: CurrentAircraftRow[] = assignments
+  /** Pipeline-generated ideas never have user-assigned metal; ignore stray DB rows. */
+  const activeAssignments = route.status === "suggested" ? [] : assignments;
+
+  const aircraft: CurrentAircraftRow[] = activeAssignments
     .slice()
     .sort((a, b) => a.position - b.position)
     .map((a) => ({
