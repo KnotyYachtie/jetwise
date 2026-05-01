@@ -1,15 +1,14 @@
 # Fleet API (`GET /api/fleet`) — `summary` metric dictionary
 
-This document traces **only** the seven fields returned under `summary` in `web-app/app/api/fleet/route.ts`. Values follow the actual implementation; downstream economics (`evaluateWithFixedConfig`, `evaluateAircraftOnRoute`, ticket pricing, etc.) are treated as the **source of per-aircraft / per-combo weekly profit** without restating every fuel/CO₂ formula here.
+This document traces **only** the six fields returned under `summary` in `web-app/app/api/fleet/route.ts`. Values follow the actual implementation; downstream economics (`evaluateWithFixedConfig`, `evaluateAircraftOnRoute`, ticket pricing, etc.) are treated as the **source of per-aircraft / per-combo weekly profit** without restating every fuel/CO₂ formula here.
 
 ---
 
 ## Call chain (high level)
 
-1. `GET` handler loads `company` (`getCompany`), `routes` (`getEnrichedRoutes`), and all `route_assignments` rows (`sql\`SELECT id, route_id FROM route_assignments\``).
+1. `GET` handler loads `routes` (`getEnrichedRoutes`) and all `route_assignments` rows (`sql\`SELECT id, route_id FROM route_assignments\``).
 2. Each `RoutePayload` is built in `getEnrichedRoutes` → `enrichRoute` (`route-payload.ts`): **current** weekly profit = `evaluateCurrentAssignment(...).total_profit_per_week`; **optimized** weekly profit = `optimizeRoute(...).total_profit_per_week` (among other optimized fields).
-3. Fleet aggregates and comparisons are computed **only** in the fleet route handler (lines 11–47).
-4. `reallocation_opportunity_count` = `suggestReallocations(...).length` (`reallocation.ts`), using a slim projection of each route’s `current.aircraft` and `optimized.marginal_a330_value` / `marginal_a380_value`.
+3. Fleet aggregates and comparisons are computed **only** in the fleet route handler.
 
 ---
 
@@ -50,7 +49,7 @@ This document traces **only** the seven fields returned under `summary` in `web-
 
 ### `route_count`
 
-- **Code:** `routes.length` (`fleet/route.ts` ~L44).
+- **Code:** `routes.length` (`fleet/route.ts`).
 - **Origin of `routes`:** `getEnrichedRoutes` → `sql\`SELECT * FROM routes ORDER BY ...\`` (`routes-data.ts` ~L13–17).
 - **Formula (plain):** Number of rows returned from `routes` table (all routes loaded, regardless of status field in DB — **no** `WHERE status = 'active'` in this path).
 - **Edge cases:** Includes routes that may have zero assignments.
@@ -77,21 +76,6 @@ This document traces **only** the seven fields returned under `summary` in `web-
   - Routes with **zero** aircraft: `n` becomes **1**, so `routeAsset` equals full route weekly profit ÷ 7 (same as attributing all profit to one virtual slot). The `n > 0` check is always true after `|| 1`.
   - If `aircraft_count === 0`, `totalDailyAsset === 0`; then `routeAsset < 0` only if weekly profit is negative — otherwise **no** route increments (strict `<` vs `0`).
   - Uses the same `?? 0` on weekly profit as the fleet total.
-
----
-
-### `reallocation_opportunity_count`
-
-- **Code:** `suggestions.length` where `suggestions = suggestReallocations(forRealloc, company)` (`fleet/route.ts` ~L24–37, ~L47).
-- **`forRealloc` projection:** Per route: `id`, `origin`, `destination`, `distance`, `demand`, `current: { aircraft }`, `optimized: { marginal_a330_value, marginal_a380_value }` (from enriched payload).
-- **`suggestReallocations` (`reallocation.ts`):**
-  - Only considers **from** routes with **`current.aircraft.length >= 2`**.
-  - Computes **per-aircraft marginal contributions** via `perAircraftContribution`: for each index `i`, `full.total_profit_per_week - evaluateCurrentAssignment(..., rows without i).total_profit_per_week`.
-  - Picks **`sec`**, the aircraft with the **smallest** such contribution (the “weakest” hull on that route).
-  - For every **other** route `to` (`to.id !== from.id`), reads `pot = marginal_a380_value` or `marginal_a330_value` matching `sec.type`. If `pot <= sec.contribution`, skip; else pushes one suggestion with `net_fleet_gain = pot - sec.contribution`.
-  - Returns the full list (sorted by `net_fleet_gain` descending); **count includes every valid `(from, to, weakest-type)` pair**, not deduplicated by aircraft.
-- **Formula (plain):** Number of ordered pairs *(heavy multi-aircraft route, different target route)* where moving the **lowest-contribution** current aircraft to the target’s **marginal slot value** (by type) shows strict improvement.
-- **Edge cases:** Routes with fewer than two aircraft generate **no** outbound suggestions. Marginal values come from **`optimizeRoute`** equal-split baseline for that route (`optimizer.ts` marginal probe), not from DB assignment on the target route.
 
 ---
 
@@ -169,20 +153,6 @@ export const FleetMetricDefinitions = {
     source: "web-app/app/api/fleet/route.ts belowFleet loop",
     notes:
       "Zero-aircraft routes use divisor 1 (|| 1), so their 'per-slot' yield equals full route weekly/7. The n > 0 guard is redundant after || 1. Strict inequality vs fleet average.",
-  },
-
-  reallocation_opportunity_count: {
-    description:
-      "Number of (from_route, to_route) suggestions emitted by suggestReallocations: multi-aircraft routes only, weakest hull’s contribution compared to target route’s marginal A330/A380 value.",
-    formula: "suggestReallocations(forRealloc, company).length",
-    inputs: [
-      "routes projected to RouteForRealloc (distance, demand, current.aircraft, optimized marginals)",
-      "company",
-      "per-aircraft contributions via evaluateCurrentAssignment deltas",
-    ],
-    source: "web-app/app/api/fleet/route.ts suggestions; web-app/lib/reallocation.ts suggestReallocations",
-    notes:
-      "Requires >= 2 aircraft on from route. One suggestion per qualifying (from,to) pair with strict marginal gain. Sorted list length equals count (no separate cap).",
   },
 } as const;
 ```

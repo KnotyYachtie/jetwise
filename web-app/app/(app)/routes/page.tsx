@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { JwCard } from "@/components/JwCard";
+import { RouteRevenueEfficiencyRing } from "@/components/RouteRevenueEfficiencyRing";
 import { shortenAirportHeadline } from "@/lib/airport-display-labels";
 import { api } from "@/lib/api-client";
 import { MINUTES_PER_WEEK } from "@/lib/economics";
@@ -59,7 +60,7 @@ export default function RoutesListPage() {
   const [optLoading, setOptLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     setErr(null);
     try {
       const j = await api<Res>("/api/routes");
@@ -67,11 +68,13 @@ export default function RoutesListPage() {
     } catch (e) {
       setErr((e as Error).message);
     }
-  }
+  }, []);
 
   useEffect(() => {
-    void load();
-  }, []);
+    queueMicrotask(() => {
+      void load();
+    });
+  }, [load]);
 
   async function optimizeAll() {
     setOptLoading(true);
@@ -137,17 +140,19 @@ export default function RoutesListPage() {
 
       {err ? <p className="text-sm text-orange-400">{err}</p> : null}
 
-      <div className="space-y-4">
+      <div className="space-y-6 sm:space-y-7">
         {rows.map((r) => {
           const delta = r.comparison?.delta_per_week ?? 0;
           const sched = r.optimized.scheduling;
           const curHr = weeklyToPerHour(r.current?.weekly_profit_per_week ?? 0);
           const optHr = weeklyToPerHour(r.optimized.total_profit_per_week);
+          const curWk = r.current?.weekly_profit_per_week ?? 0;
+          const optWk = r.optimized.total_profit_per_week;
           return (
             <Link key={r.id} href={`/routes/${r.id}`}>
-              <article className="rounded-2xl border border-zinc-800 bg-zinc-950/40 p-5 transition hover:border-cyan-500/35 hover:shadow-[0_0_40px_-12px_rgba(34,211,238,0.35)]">
+              <article className="rounded-2xl border border-zinc-800 bg-zinc-950/40 p-5 shadow-sm transition hover:border-cyan-500/35 hover:shadow-[0_0_40px_-12px_rgba(34,211,238,0.35)] sm:p-6">
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-xs uppercase tracking-widest text-zinc-500">
                       {r.hub ?? "— hub"}
                     </p>
@@ -165,11 +170,22 @@ export default function RoutesListPage() {
                       {sched?.trips_per_week ?? "—"}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[10px] uppercase tracking-widest text-zinc-500">Δ optimized − current</p>
-                    <p className={delta >= 0 ? "font-mono text-lg text-emerald-400" : "font-mono text-lg text-orange-400"}>
-                      {usd(delta)}
-                    </p>
+                  <div className="flex shrink-0 flex-row items-start gap-4 sm:gap-5">
+                    <RouteRevenueEfficiencyRing
+                      currentWeekly={curWk}
+                      optimizedWeekly={optWk}
+                      label={`${r.origin} → ${r.destination}`}
+                    />
+                    <div className="text-right">
+                      <p className="text-[10px] uppercase tracking-widest text-zinc-500">Δ optimized − current</p>
+                      <p
+                        className={
+                          delta >= 0 ? "font-mono text-lg text-emerald-400" : "font-mono text-lg text-orange-400"
+                        }
+                      >
+                        {usd(delta)}
+                      </p>
+                    </div>
                   </div>
                 </div>
                 <div className="mt-4 grid gap-3 border-t border-zinc-800 pt-4 text-sm sm:grid-cols-2">

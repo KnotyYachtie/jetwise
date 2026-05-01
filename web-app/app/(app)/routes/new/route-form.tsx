@@ -28,56 +28,63 @@ export default function RouteForm({ editId }: { editId?: string }) {
   const [distanceNote, setDistanceNote] = useState<string | null>(null);
 
   useEffect(() => {
-    const o = origin.trim().toUpperCase();
-    const d = destination.trim().toUpperCase();
-
-    if (o.length < 3 || d.length < 3) {
-      setDistanceKm(null);
-      setDistanceNote(null);
-      setDistanceLoading(false);
-      return;
-    }
-
-    if (o === d) {
-      setDistanceKm(0);
-      setDistanceNote(null);
-      setDistanceLoading(false);
-      return;
-    }
-
-    setDistanceLoading(true);
-    setDistanceNote(null);
-
+    let cancelled = false;
     const ac = new AbortController();
-    const t = setTimeout(() => {
-      fetch(
-        `/api/airports/distance?origin=${encodeURIComponent(o)}&destination=${encodeURIComponent(d)}`,
-        { credentials: "include", signal: ac.signal }
-      )
-        .then((r) => r.json() as Promise<{ roundedKm?: number; missing?: (string | null)[] }>)
-        .then((body) => {
-          if (typeof body.roundedKm === "number" && Number.isFinite(body.roundedKm)) {
-            setDistanceKm(body.roundedKm);
-            setDistanceNote(null);
-          } else {
+    let t: ReturnType<typeof setTimeout> | undefined;
+
+    queueMicrotask(() => {
+      if (cancelled) return;
+      const o = origin.trim().toUpperCase();
+      const d = destination.trim().toUpperCase();
+
+      if (o.length < 3 || d.length < 3) {
+        setDistanceKm(null);
+        setDistanceNote(null);
+        setDistanceLoading(false);
+        return;
+      }
+
+      if (o === d) {
+        setDistanceKm(0);
+        setDistanceNote(null);
+        setDistanceLoading(false);
+        return;
+      }
+
+      setDistanceLoading(true);
+      setDistanceNote(null);
+
+      t = setTimeout(() => {
+        fetch(
+          `/api/airports/distance?origin=${encodeURIComponent(o)}&destination=${encodeURIComponent(d)}`,
+          { credentials: "include", signal: ac.signal }
+        )
+          .then((r) => r.json() as Promise<{ roundedKm?: number; missing?: (string | null)[] }>)
+          .then((body) => {
+            if (typeof body.roundedKm === "number" && Number.isFinite(body.roundedKm)) {
+              setDistanceKm(body.roundedKm);
+              setDistanceNote(null);
+            } else {
+              setDistanceKm(null);
+              const miss = (body.missing ?? []).filter(Boolean) as string[];
+              setDistanceNote(
+                miss.length
+                  ? `Missing coordinates in airport_lookup for: ${miss.join(", ")}.`
+                  : "Could not compute distance."
+              );
+            }
+          })
+          .catch(() => {
             setDistanceKm(null);
-            const miss = (body.missing ?? []).filter(Boolean) as string[];
-            setDistanceNote(
-              miss.length
-                ? `Missing coordinates in airport_lookup for: ${miss.join(", ")}.`
-                : "Could not compute distance."
-            );
-          }
-        })
-        .catch(() => {
-          setDistanceKm(null);
-          setDistanceNote("Could not compute distance.");
-        })
-        .finally(() => setDistanceLoading(false));
-    }, 400);
+            setDistanceNote("Could not compute distance.");
+          })
+          .finally(() => setDistanceLoading(false));
+      }, 400);
+    });
 
     return () => {
-      clearTimeout(t);
+      cancelled = true;
+      if (t !== undefined) clearTimeout(t);
       ac.abort();
     };
   }, [origin, destination]);

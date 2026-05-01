@@ -15,6 +15,16 @@
   --jw-accent: #22d3ee;
   --jw-warn: #fb923c;
   --jw-orange-glow: rgba(251, 146, 60, 0.55);
+  /* 3D globe (r3f-globe) — mirror numeric values in lib/jw-design-tokens.ts */
+  --jw-globe-base: #040c12;
+  --jw-globe-emissive: #062a32;
+  --jw-globe-emissive-intensity: 0.55;
+  --jw-globe-atmosphere: #22d3ee;
+  --jw-globe-atmosphere-altitude: 0.18;
+  --jw-globe-arc: #22d3ee;
+  --jw-globe-fog: #000000;
+  --jw-globe-ambient: #1a1a1e;
+  --jw-globe-directional: #e4e4e7;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);

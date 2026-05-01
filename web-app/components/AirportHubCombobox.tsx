@@ -56,40 +56,47 @@ export function AirportHubCombobox({
   }, [value, baseList, apiResults]);
 
   useEffect(() => {
-    const q = value.trim();
-    if (q.length < 2) {
-      setApiResults(null);
-      setLoading(false);
-      return;
-    }
-    if (timerRef.current) clearTimeout(timerRef.current);
-    setRateMsg(null);
-    timerRef.current = setTimeout(() => {
-      setLoading(true);
-      fetch(`/api/airports/search?q=${encodeURIComponent(q)}`, { credentials: "include" })
-        .then(async (r) => {
-          if (r.status === 429) {
-            setRateMsg("Too many searches — wait a moment.");
-            setApiResults(null);
-            return;
-          }
-          if (!r.ok) {
-            setApiResults(null);
-            return;
-          }
-          const d = (await r.json()) as { results: AirportSearchResult[] };
-          setApiResults(d.results ?? []);
-        })
-        .catch(() => setApiResults(null))
-        .finally(() => setLoading(false));
-    }, 380);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      const q = value.trim();
+      if (q.length < 2) {
+        setApiResults(null);
+        setLoading(false);
+        return;
+      }
+      if (timerRef.current) clearTimeout(timerRef.current);
+      setRateMsg(null);
+      timerRef.current = setTimeout(() => {
+        setLoading(true);
+        fetch(`/api/airports/search?q=${encodeURIComponent(q)}`, { credentials: "include" })
+          .then(async (r) => {
+            if (r.status === 429) {
+              setRateMsg("Too many searches — wait a moment.");
+              setApiResults(null);
+              return;
+            }
+            if (!r.ok) {
+              setApiResults(null);
+              return;
+            }
+            const d = (await r.json()) as { results: AirportSearchResult[] };
+            setApiResults(d.results ?? []);
+          })
+          .catch(() => setApiResults(null))
+          .finally(() => setLoading(false));
+      }, 380);
+    });
     return () => {
+      cancelled = true;
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [value]);
 
   useEffect(() => {
-    setHighlight(0);
+    queueMicrotask(() => {
+      setHighlight(0);
+    });
   }, [items.length, value]);
 
   const onKeyDown = useCallback(

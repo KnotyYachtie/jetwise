@@ -8,7 +8,7 @@ const buckets = new Map<string, { count: number; windowStart: number }>();
 
 export function checkSearchRateLimit(ip: string): { ok: boolean; retryAfterSec?: number } {
   const now = Date.now();
-  let b = buckets.get(ip);
+  const b = buckets.get(ip);
   if (!b || now - b.windowStart > WINDOW_MS) {
     buckets.set(ip, { count: 1, windowStart: now });
     return { ok: true };

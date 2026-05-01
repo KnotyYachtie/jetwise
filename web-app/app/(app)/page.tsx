@@ -15,7 +15,6 @@ type FleetRes = {
     route_count: number;
     fleet_average_daily_asset_yield: number;
     routes_below_fleet_average: number;
-    reallocation_opportunity_count: number;
   };
 };
 
@@ -64,18 +63,10 @@ export default function FleetDashboardPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <JwCard title="Yield & signals" subtitle="Daily asset yield drives redeployment decisions">
+        <JwCard title="Yield & signals" subtitle="Daily asset yield drives route review">
           <dl className="grid gap-4 text-sm">
             <Row label="Fleet avg daily asset yield" value={usd(s.fleet_average_daily_asset_yield)} />
             <Row label="Routes below fleet avg yield" value={String(s.routes_below_fleet_average)} />
-            <Row
-              label="Reallocation opportunities"
-              value={
-                <Link href="/reallocation" className="text-cyan-300 underline-offset-4 hover:underline">
-                  {s.reallocation_opportunity_count}
-                </Link>
-              }
-            />
           </dl>
         </JwCard>
 
@@ -83,7 +74,6 @@ export default function FleetDashboardPage() {
           <div className="flex flex-wrap gap-3">
             <Shortcut href="/routes">Route pipeline</Shortcut>
             <Shortcut href="/hubs">Hub matrix</Shortcut>
-            <Shortcut href="/reallocation">Reallocate</Shortcut>
             <Shortcut href="/settings">Markets &amp; CI</Shortcut>
           </div>
         </JwCard>

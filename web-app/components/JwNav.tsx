@@ -7,7 +7,6 @@ const items: { href: string; label: string; mobileLabel: string }[] = [
   { href: "/", label: "Fleet", mobileLabel: "Fleet" },
   { href: "/routes", label: "Routes", mobileLabel: "Routes" },
   { href: "/hubs", label: "Hubs", mobileLabel: "Hubs" },
-  { href: "/reallocation", label: "Reallocate", mobileLabel: "Move" },
   { href: "/settings", label: "Markets", mobileLabel: "Mkts" },
 ];
 
@@ -43,14 +42,6 @@ function IconHubs({ className }: { className?: string }) {
   );
 }
 
-function IconRealloc({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} aria-hidden>
-      <path d="M7 16V4m0 0L4 7m3-3 3 3M17 8v12m0 0 3-3m-3 3-3-3" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 function IconMarkets({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} aria-hidden>
@@ -68,7 +59,7 @@ function IconLogout({ className }: { className?: string }) {
   );
 }
 
-const mobileIcons = [IconFleet, IconRoutes, IconHubs, IconRealloc, IconMarkets] as const;
+const mobileIcons = [IconFleet, IconRoutes, IconHubs, IconMarkets] as const;
 
 function linkClass(on: boolean) {
   return on

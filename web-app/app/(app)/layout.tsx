@@ -1,4 +1,4 @@
-import { JwRouteWorldMapBackdrop } from "@/components/JwRouteWorldMapBackdrop";
+import { JwGlobeBackdrop } from "@/components/JwGlobeBackdrop";
 import { JwMobileBottomNav, JwNavHeader } from "@/components/JwNav";
 import { getRouteMapDots } from "@/lib/route-map-dots";
 
@@ -9,7 +9,7 @@ export default async function AppShellLayout({ children }: { children: React.Rea
 
   return (
     <div className="jw-app-shell flex min-h-screen flex-col">
-      <JwRouteWorldMapBackdrop dots={dots} />
+      <JwGlobeBackdrop dots={dots} />
       <JwNavHeader />
       <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 pb-[calc(5.25rem+env(safe-area-inset-bottom))] pt-8 md:pb-8">
         {children}

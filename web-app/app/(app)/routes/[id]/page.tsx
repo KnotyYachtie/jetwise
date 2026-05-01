@@ -25,7 +25,7 @@
 // --- Imports: other files we depend on (UI, API helper, formatting, constants) ---
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { JwCard } from "@/components/JwCard";
 import { api } from "@/lib/api-client";
 import { shortenAirportHeadline } from "@/lib/airport-display-labels";
@@ -209,7 +209,7 @@ export default function RouteDetailPage() {
    * load — Fetches this route’s details AND the full route list (for ranks).
    * Called on first paint and whenever `id` changes.
    */
-  async function load() {
+  const load = useCallback(async () => {
     setErr(null);
     try {
       const j = await api<RouteRes>(`/api/routes/${id}`);
@@ -219,12 +219,14 @@ export default function RouteDetailPage() {
     } catch (e) {
       setErr((e as Error).message);
     }
-  }
+  }, [id]);
 
   // When the page opens or the route id in the URL changes, load fresh data.
   useEffect(() => {
-    void load();
-  }, [id]);
+    queueMicrotask(() => {
+      void load();
+    });
+  }, [load]);
 
   /** Delete route: asks for confirmation, calls API, then returns to /routes. */
   async function remove() {
@@ -279,14 +281,6 @@ export default function RouteDetailPage() {
   const currentProfitPerHour =
     currentFlightHoursPerWeek > 0 ? (r.current.weekly_profit_per_week ?? 0) / currentFlightHoursPerWeek : 0;
 
-  const optimizedRevenuePerWeek = optimizedRows.reduce(
-    (sum, row) => sum + row.revenue_per_flight * row.trips_per_week,
-    0
-  );
-  const optimizedCostPerWeek = optimizedRows.reduce(
-    (sum, row) => sum + row.cost_per_flight * row.trips_per_week,
-    0
-  );
   const optimizedFlightHoursPerWeek = optimizedRows.reduce(
     (sum, row) => sum + row.flight_time_hours * row.trips_per_week,
     0

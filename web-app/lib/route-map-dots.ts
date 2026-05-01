@@ -30,7 +30,7 @@ function segment(
 }
 
 /**
- * Builds world-map segments from stored routes (not optimizer output).
+ * Builds globe arc segments from stored routes (not optimizer output).
  * One segment per leg: origin→stop and stop→destination when `technical_stop` is set.
  */
 export async function getRouteMapDots(): Promise<RouteMapDot[]> {
