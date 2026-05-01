@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "import-suggestions": "tsx scripts/rank-import-suggestions.ts",
     "import-airports": "node scripts/import-airports.mjs",
     "import-airports-csv": "node scripts/import-airports-slim-csv.mjs"
   },
@@ -41,6 +42,7 @@
     "eslint-config-next": "16.2.4",
     "pg": "^8.13.1",
     "tailwindcss": "^4",
+    "tsx": "^4.19.4",
     "typescript": "^5"
   }
 }

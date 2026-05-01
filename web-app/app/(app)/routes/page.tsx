@@ -122,6 +122,12 @@ export default function RoutesListPage() {
         </div>
         <div className="flex flex-wrap gap-3">
           <Link
+            href="/routes/suggestions"
+            className="rounded-xl border border-white/15 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-zinc-200 hover:border-cyan-500/35"
+          >
+            Suggestions
+          </Link>
+          <Link
             href="/routes/new"
             className="rounded-xl border border-cyan-500/35 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-100"
           >

@@ -1,13 +1,17 @@
 import { randomUUID } from "crypto";
 import { sql } from "@vercel/postgres";
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { replaceRouteAssignments, type AssignmentInput } from "@/lib/assignments-sync";
 import { isValidHub } from "@/lib/hubs";
 import { getEnrichedRouteById, getEnrichedRoutes } from "@/lib/routes-data";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const routes = await getEnrichedRoutes();
+    const status = req.nextUrl.searchParams.get("status")?.trim();
+    let routes = await getEnrichedRoutes();
+    if (status) {
+      routes = routes.filter((r) => r.status === status);
+    }
     return NextResponse.json({ routes });
   } catch (err) {
     console.error(err);

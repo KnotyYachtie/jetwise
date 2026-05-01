@@ -1,18 +1,21 @@
 "use client";
 
 import Link from "next/link";
+import { Sparkles } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
 const items: { href: string; label: string; mobileLabel: string }[] = [
   { href: "/", label: "Fleet", mobileLabel: "Fleet" },
   { href: "/routes", label: "Routes", mobileLabel: "Routes" },
+  { href: "/routes/suggestions", label: "Suggestions", mobileLabel: "Ideas" },
   { href: "/hubs", label: "Hubs", mobileLabel: "Hubs" },
   { href: "/settings", label: "Markets", mobileLabel: "Mkts" },
 ];
 
 function pill(href: string, current: string) {
   if (href === "/") return current === "/";
-  return current === href || (current.startsWith(href) && href !== "/");
+  if (href === "/routes") return current === "/routes";
+  return current === href || current.startsWith(`${href}/`);
 }
 
 function IconFleet({ className }: { className?: string }) {
@@ -59,7 +62,11 @@ function IconLogout({ className }: { className?: string }) {
   );
 }
 
-const mobileIcons = [IconFleet, IconRoutes, IconHubs, IconMarkets] as const;
+function IconSuggestions({ className }: { className?: string }) {
+  return <Sparkles className={className} aria-hidden strokeWidth={1.75} />;
+}
+
+const mobileIcons = [IconFleet, IconRoutes, IconSuggestions, IconHubs, IconMarkets] as const;
 
 function linkClass(on: boolean) {
   return on
