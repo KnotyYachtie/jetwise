@@ -3,12 +3,14 @@ import { sql } from "@vercel/postgres";
 import { type NextRequest, NextResponse } from "next/server";
 import { replaceRouteAssignments, type AssignmentInput } from "@/lib/assignments-sync";
 import { isValidHub } from "@/lib/hubs";
+import { optionsFromSearchParams } from "@/lib/optimizer-options";
 import { getEnrichedRouteById, getEnrichedRoutes } from "@/lib/routes-data";
 
 export async function GET(req: NextRequest) {
   try {
     const status = req.nextUrl.searchParams.get("status")?.trim();
-    let routes = await getEnrichedRoutes();
+    const optimizerOptions = optionsFromSearchParams(req.nextUrl.searchParams);
+    let routes = await getEnrichedRoutes(optimizerOptions);
     if (status) {
       routes = routes.filter((r) => r.status === status);
     } else {

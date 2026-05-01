@@ -24,7 +24,7 @@
 
 // --- Imports: other files we depend on (UI, API helper, formatting, constants) ---
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { JwCard } from "@/components/JwCard";
 import { api } from "@/lib/api-client";
@@ -139,6 +139,7 @@ function weightedTripEconomics(rows: FleetEconomicsRow[]) {
 function aircraftVariantLabel(type: string): string {
   if (type === "A380") return "A380-800";
   if (type === "A330") return "A330-800";
+  if (type === "A350") return "A350-900ULR";
   return type;
 }
 
@@ -146,6 +147,7 @@ function aircraftVariantLabel(type: string): string {
 function aircraftFullName(type: string): string {
   if (type === "A380") return "Airbus A380-800";
   if (type === "A330") return "Airbus A330-800";
+  if (type === "A350") return "Airbus A350-900ULR";
   return type;
 }
 
@@ -156,6 +158,7 @@ function aircraftFullName(type: string): string {
 function aircraftOptimizedMixSummaryName(type: string): string {
   if (type === "A380") return "Airbus A380-800";
   if (type === "A330") return "Airbus A330-800NEO";
+  if (type === "A350") return "Airbus A350-900ULR";
   return type;
 }
 
@@ -167,7 +170,7 @@ function optimizedMixLineSummary(rows: FleetEconomicsRow[]): string {
   if (!rows.length) return "—";
   const m = new Map<string, number>();
   for (const r of rows) m.set(r.type, (m.get(r.type) ?? 0) + 1);
-  const typeRank = (t: string) => (t === "A380" ? 0 : t === "A330" ? 1 : 99);
+  const typeRank = (t: string) => (t === "A380" ? 0 : t === "A350" ? 1 : t === "A330" ? 2 : 99);
   const types = [...m.keys()].sort((a, b) => typeRank(a) - typeRank(b) || a.localeCompare(b));
   return types
     .map((t) => `${m.get(t)} x ${aircraftOptimizedMixSummaryName(t)}`)
@@ -205,7 +208,9 @@ function BlendTripColumn({ children }: { children: ReactNode }) {
 export default function RouteDetailPage() {
   // URL → which route: /routes/[id] puts the id in the address bar; we read it here.
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = String(params.id);
+  const optimizerQs = searchParams.toString();
   // router lets us navigate after delete (e.g. go back to the list).
   const router = useRouter();
 
@@ -224,14 +229,15 @@ export default function RouteDetailPage() {
   const load = useCallback(async () => {
     setErr(null);
     try {
-      const j = await api<RouteRes>(`/api/routes/${id}`);
+      const suffix = optimizerQs ? `?${optimizerQs}` : "";
+      const j = await api<RouteRes>(`/api/routes/${id}${suffix}`);
       setData(j);
-      const list = await api<{ routes: RouteListBench[] }>("/api/routes");
+      const list = await api<{ routes: RouteListBench[] }>(`/api/routes${suffix}`);
       setAllRoutes(list.routes ?? []);
     } catch (e) {
       setErr((e as Error).message);
     }
-  }, [id]);
+  }, [id, optimizerQs]);
 
   // When the page opens or the route id in the URL changes, load fresh data.
   useEffect(() => {
@@ -532,7 +538,8 @@ export default function RouteDetailPage() {
             <SectionLabel>Optimal assignment (modeled)</SectionLabel>
             <p className="mb-3 text-[13px] leading-relaxed text-zinc-400">
               {optimizedMixLineSummary(optimizedRows)} · cap {MAX_AIRCRAFT_PER_ROUTE} hull · marginal A330{" "}
-              {usdAbbrev(opt.marginal_a330_value)} · A380 {usdAbbrev(opt.marginal_a380_value)}
+              {usdAbbrev(opt.marginal_a330_value)} · A350 {usdAbbrev((opt as { marginal_a350_value?: number }).marginal_a350_value ?? 0)} · A380{" "}
+              {usdAbbrev(opt.marginal_a380_value)}
             </p>
             <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {/* Same pattern as current lines, but data comes from the solver’s fleet_mix */}

@@ -27,7 +27,22 @@ export const A330_SPEC: Aircraft = {
   purchase_cost: 85_235_684,
 };
 
-export const FLEET_TYPES: Aircraft[] = [A380_SPEC, A330_SPEC];
+export const A350_SPEC: Aircraft = {
+  shortCode: "A350",
+  name: "Airbus A350-900 ULR",
+  capacity: 300,
+  range_km: 18000,
+  speed: 848,
+  fuel: 13.16,
+  co2: 0.18,
+  check_cost: 3_908_642,
+  maintenance_interval: 350,
+  purchase_cost: 91_723_576,
+};
+
+export type AircraftCode = "A380" | "A330" | "A350";
+
+export const FLEET_TYPES: Aircraft[] = [A380_SPEC, A330_SPEC, A350_SPEC];
 
 export function getAircraftByCode(code: string): Aircraft | undefined {
   return FLEET_TYPES.find((a) => a.shortCode === code);

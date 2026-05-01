@@ -3,18 +3,18 @@ import { sql } from "@vercel/postgres";
 
 export type AssignmentInput =
   | {
-      type: "A380" | "A330";
+      type: "A380" | "A330" | "A350";
       config: { y: number; j: number; f: number };
     }
   | {
-      type: "A380" | "A330";
+      type: "A380" | "A330" | "A350";
       config_y: number;
       config_j: number;
       config_f: number;
     };
 
 function normalize(a: AssignmentInput) {
-  const t = a.type === "A330" ? "A330" : "A380";
+  const t = a.type === "A330" ? "A330" : a.type === "A350" ? "A350" : "A380";
   if ("config" in a) {
     return {
       type: t,

@@ -1,4 +1,4 @@
-import { A380_SPEC, A330_SPEC } from "./aircraft-data";
+import { A350_SPEC, A380_SPEC, A330_SPEC, type AircraftCode } from "./aircraft-data";
 import type { Aircraft, Company, FlightEconomics, SchedulingInfo } from "./economics";
 import {
   dailyThroughputFromSchedule,
@@ -44,8 +44,16 @@ export type OptimizedRouteResult = {
   demand_fulfilled_optimized: number;
   marginal_a330_value: number;
   marginal_a380_value: number;
+  marginal_a350_value: number;
   marginal_values: { aircraft: string; value: number }[];
   scheduling_summary: SchedulingInfo;
+};
+
+export type OptimizerOptions = {
+  allow_a380?: boolean;
+  allow_a330?: boolean;
+  allow_a350?: boolean;
+  hull_penalty_per_aircraft?: number;
 };
 
 export type ComparisonResult = {
@@ -106,42 +114,35 @@ function splitDemandEqually(demand: Demand, k: number): Demand[] {
 }
 
 export function orderAircraftForCombo(
-  n380: number,
-  n330: number,
+  counts: Record<AircraftCode, number>,
+  activeFleet: Aircraft[],
   company: Company,
   distance: number,
   fullDemand: Demand
 ) {
-  const list = [
-    ...Array.from({ length: n380 }, () => A380_SPEC),
-    ...Array.from({ length: n330 }, () => A330_SPEC),
-  ];
-  const s380 = soloWeeklyProfit(A380_SPEC, company, distance, fullDemand);
-  const s330 = soloWeeklyProfit(A330_SPEC, company, distance, fullDemand);
-  if (s380 >= s330) {
-    return [
-      ...list.filter((a) => a.shortCode === "A380"),
-      ...list.filter((a) => a.shortCode === "A330"),
-    ] as Aircraft[];
+  const list: Aircraft[] = [];
+  for (const ac of activeFleet) {
+    const n = counts[ac.shortCode as AircraftCode] ?? 0;
+    for (let i = 0; i < n; i++) list.push(ac);
   }
-  return [
-    ...list.filter((a) => a.shortCode === "A330"),
-    ...list.filter((a) => a.shortCode === "A380"),
-  ] as Aircraft[];
+  const score = new Map(
+    activeFleet.map((ac) => [ac.shortCode, soloWeeklyProfit(ac, company, distance, fullDemand)])
+  );
+  return list.sort((a, b) => (score.get(b.shortCode) ?? -Infinity) - (score.get(a.shortCode) ?? -Infinity));
 }
 
 function evaluateComboCounts(
-  n380: number,
-  n330: number,
+  counts: Record<AircraftCode, number>,
+  activeFleet: Aircraft[],
   company: Company,
   distance: number,
   demand: Demand,
   maxPlanes = MAX_AIRCRAFT_PER_ROUTE
 ): { plan: FleetMixRow[]; total_profit_per_week: number; fulfilled: number } | null {
-  const totalPlanes = n380 + n330;
+  const totalPlanes = Object.values(counts).reduce((s, n) => s + n, 0);
   if (totalPlanes < 1 || totalPlanes > maxPlanes) return null;
 
-  const ordered = orderAircraftForCombo(n380, n330, company, distance, demand);
+  const ordered = orderAircraftForCombo(counts, activeFleet, company, distance, demand);
   let remaining: Demand = { ...demand };
   const planRows: { ac: Aircraft; fe: FlightEconomics }[] = [];
 
@@ -178,17 +179,17 @@ function evaluateComboCounts(
  * Produces more uniform cabins across parallel hulls; weekly profit may differ from sequential greedy.
  */
 function evaluateComboCountsEqualSplit(
-  n380: number,
-  n330: number,
+  counts: Record<AircraftCode, number>,
+  activeFleet: Aircraft[],
   company: Company,
   distance: number,
   demand: Demand,
   maxPlanes = MAX_AIRCRAFT_PER_ROUTE
 ): { plan: FleetMixRow[]; total_profit_per_week: number; fulfilled: number } | null {
-  const totalPlanes = n380 + n330;
+  const totalPlanes = Object.values(counts).reduce((s, n) => s + n, 0);
   if (totalPlanes < 1 || totalPlanes > maxPlanes) return null;
 
-  const ordered = orderAircraftForCombo(n380, n330, company, distance, demand);
+  const ordered = orderAircraftForCombo(counts, activeFleet, company, distance, demand);
   const chunks = splitDemandEqually(demand, ordered.length);
   const planRows: { ac: Aircraft; fe: FlightEconomics }[] = [];
 
@@ -214,20 +215,19 @@ function evaluateComboCountsEqualSplit(
 
 /** Marginal: +1 frame vs optimized baseline using equal-split economics (matches fleet_mix semantics). */
 function evaluateOneExtraPlaneEqualSplit(
-  n380: number,
-  n330: number,
-  extra: "A380" | "A330",
+  counts: Record<AircraftCode, number>,
+  activeFleet: Aircraft[],
+  extra: AircraftCode,
   company: Company,
   distance: number,
   demand: Demand,
   baselineWeeklyProfit: number
 ): number {
-  const n380e = n380 + (extra === "A380" ? 1 : 0);
-  const n330e = n330 + (extra === "A330" ? 1 : 0);
-  if (n380e + n330e > MAX_AIRCRAFT_MARGINAL_PROBE) return baselineWeeklyProfit;
+  const next = { ...counts, [extra]: (counts[extra] ?? 0) + 1 };
+  if (Object.values(next).reduce((s, n) => s + n, 0) > MAX_AIRCRAFT_MARGINAL_PROBE) return baselineWeeklyProfit;
   const result = evaluateComboCountsEqualSplit(
-    n380e,
-    n330e,
+    next,
+    activeFleet,
     company,
     distance,
     demand,
@@ -255,21 +255,62 @@ function schedulingFromPlan(plan: FleetMixRow[]): SchedulingInfo {
 export function optimizeRoute(
   distance: number,
   demand: Demand,
-  company: Company
+  company: Company,
+  options: OptimizerOptions = {}
 ): OptimizedRouteResult {
-  let best: { n380: number; n330: number; plan: FleetMixRow[]; total: number; fulfilled: number } | null =
-    null;
+  const allowA380 = options.allow_a380 ?? true;
+  const allowA330 = options.allow_a330 ?? true;
+  const allowA350 = options.allow_a350 ?? true;
+  const hullPenalty = Number.isFinite(options.hull_penalty_per_aircraft)
+    ? Math.max(0, options.hull_penalty_per_aircraft ?? 0)
+    : 0;
 
-  for (let n380 = 0; n380 <= MAX_AIRCRAFT_PER_ROUTE; n380++) {
-    for (let n330 = 0; n330 <= MAX_AIRCRAFT_PER_ROUTE; n330++) {
-      if (n380 + n330 < 1 || n380 + n330 > MAX_AIRCRAFT_PER_ROUTE) continue;
-      const r = evaluateComboCounts(n380, n330, company, distance, demand);
-      if (!r) continue;
-      if (!best || r.total_profit_per_week > best.total) {
-        best = { n380, n330, plan: r.plan, total: r.total_profit_per_week, fulfilled: r.fulfilled };
+  const activeFleet: Aircraft[] = [
+    ...(allowA380 ? [A380_SPEC] : []),
+    ...(allowA330 ? [A330_SPEC] : []),
+    ...(allowA350 ? [A350_SPEC] : []),
+  ];
+
+  type Counts = Record<AircraftCode, number>;
+  type BestChoice = {
+    counts: Counts;
+    plan: FleetMixRow[];
+    total: number;
+    fulfilled: number;
+    adjustedTotal: number;
+  };
+  let best: BestChoice | null = null;
+
+  const codes = activeFleet.map((ac) => ac.shortCode as AircraftCode);
+  const seed: Counts = { A380: 0, A330: 0, A350: 0 };
+
+  function enumerate(idx: number, counts: Counts, totalPlanes: number) {
+    if (idx === codes.length) {
+      if (totalPlanes < 1 || totalPlanes > MAX_AIRCRAFT_PER_ROUTE) return;
+      const r = evaluateComboCounts(counts, activeFleet, company, distance, demand);
+      if (!r) return;
+      const adjusted = r.total_profit_per_week - hullPenalty * totalPlanes;
+      if (!best || adjusted > best.adjustedTotal) {
+        best = {
+          counts: { ...counts },
+          plan: r.plan,
+          total: r.total_profit_per_week,
+          fulfilled: r.fulfilled,
+          adjustedTotal: adjusted,
+        };
       }
+      return;
     }
+
+    const code = codes[idx]!;
+    for (let n = 0; n <= MAX_AIRCRAFT_PER_ROUTE - totalPlanes; n++) {
+      counts[code] = n;
+      enumerate(idx + 1, counts, totalPlanes + n);
+    }
+    counts[code] = 0;
   }
+
+  enumerate(0, { ...seed }, 0);
 
   if (!best) {
     return {
@@ -278,39 +319,28 @@ export function optimizeRoute(
       demand_fulfilled_optimized: 0,
       marginal_a330_value: 0,
       marginal_a380_value: 0,
+      marginal_a350_value: 0,
       marginal_values: [
         { aircraft: "A330", value: 0 },
         { aircraft: "A380", value: 0 },
+        { aircraft: "A350", value: 0 },
       ],
       scheduling_summary: schedulingFromPlan([]),
     };
   }
+  const chosen = best as BestChoice;
 
-  const normalized = evaluateComboCountsEqualSplit(best.n380, best.n330, company, distance, demand);
-  const outputPlan = normalized ?? best;
-  const outputTotal = normalized?.total_profit_per_week ?? best.total;
-  const outputFulfilled = normalized?.fulfilled ?? best.fulfilled;
-
-  const withExtra330 = evaluateOneExtraPlaneEqualSplit(
-    best.n380,
-    best.n330,
-    "A330",
-    company,
-    distance,
-    demand,
-    outputTotal
-  );
-  const withExtra380 = evaluateOneExtraPlaneEqualSplit(
-    best.n380,
-    best.n330,
-    "A380",
-    company,
-    distance,
-    demand,
-    outputTotal
-  );
-  const marg330 = withExtra330 - outputTotal;
-  const marg380 = withExtra380 - outputTotal;
+  const normalized = evaluateComboCountsEqualSplit(chosen.counts, activeFleet, company, distance, demand);
+  const outputPlan = normalized ?? chosen;
+  const outputTotal = normalized?.total_profit_per_week ?? chosen.total;
+  const outputFulfilled = normalized?.fulfilled ?? chosen.fulfilled;
+  const withExtra = (code: AircraftCode) =>
+    activeFleet.some((a) => a.shortCode === code)
+      ? evaluateOneExtraPlaneEqualSplit(chosen.counts, activeFleet, code, company, distance, demand, outputTotal)
+      : outputTotal;
+  const marg330 = withExtra("A330") - outputTotal;
+  const marg380 = withExtra("A380") - outputTotal;
+  const marg350 = withExtra("A350") - outputTotal;
 
   return {
     fleet_mix: outputPlan.plan,
@@ -318,9 +348,11 @@ export function optimizeRoute(
     demand_fulfilled_optimized: outputFulfilled,
     marginal_a330_value: marg330,
     marginal_a380_value: marg380,
+    marginal_a350_value: marg350,
     marginal_values: [
       { aircraft: "A330", value: marg330 },
       { aircraft: "A380", value: marg380 },
+      { aircraft: "A350", value: marg350 },
     ],
     scheduling_summary: schedulingFromPlan(outputPlan.plan),
   };
@@ -338,7 +370,7 @@ export function evaluateCurrentAssignment(
   let total = 0;
 
   for (const row of rows) {
-    const ac = row.type === "A380" ? A380_SPEC : A330_SPEC;
+    const ac = row.type === "A380" ? A380_SPEC : row.type === "A350" ? A350_SPEC : A330_SPEC;
     const fe = evaluateWithFixedConfig(ac, company, distance, row.config);
     if (!fe) continue;
     total += fe.profit_per_week;

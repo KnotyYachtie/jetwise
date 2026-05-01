@@ -8,7 +8,7 @@ import { api } from "@/lib/api-client";
 import { isValidHub } from "@/lib/hubs";
 import { MAX_AIRCRAFT_PER_ROUTE } from "@/lib/optimizer";
 
-type Ac = { type: "A380" | "A330"; y: string; j: string; f: string };
+type Ac = { type: "A380" | "A330" | "A350"; y: string; j: string; f: string };
 
 export default function RouteForm({ editId }: { editId?: string }) {
   const router = useRouter();
@@ -111,7 +111,7 @@ export default function RouteForm({ editId }: { editId?: string }) {
         setNotes(r.notes || "");
         setAircraft(
           r.current.aircraft.map((a) => ({
-            type: a.type === "A330" ? "A330" : "A380",
+            type: a.type === "A330" ? "A330" : a.type === "A350" ? "A350" : "A380",
             y: String(a.config.y),
             j: String(a.config.j),
             f: String(a.config.f),
@@ -254,13 +254,14 @@ export default function RouteForm({ editId }: { editId?: string }) {
                   value={a.type}
                   onChange={(e) => {
                     const next = [...aircraft];
-                    next[i] = { ...next[i]!, type: e.target.value as "A380" | "A330" };
+                    next[i] = { ...next[i]!, type: e.target.value as "A380" | "A330" | "A350" };
                     setAircraft(next);
                   }}
                   className="mt-1 w-full rounded border border-zinc-800 bg-black px-2 py-1 text-sm"
                 >
                   <option value="A380">A380</option>
                   <option value="A330">A330</option>
+                  <option value="A350">A350</option>
                 </select>
               </div>
               <Field label="Y" value={a.y} onChange={(v) => {

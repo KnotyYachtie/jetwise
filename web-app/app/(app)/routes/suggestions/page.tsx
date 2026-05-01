@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { JwCard } from "@/components/JwCard";
 import { api } from "@/lib/api-client";
 import { usdAbbrev } from "@/lib/format";
+import { optionsToQuery } from "@/lib/optimizer-options";
 
 type SugRoute = {
   id: string;
@@ -26,14 +27,23 @@ export default function RouteSuggestionsPage() {
   const [err, setErr] = useState<string | null>(null);
   const [pipelineBusy, setPipelineBusy] = useState(false);
   const [pipelineLog, setPipelineLog] = useState<string | null>(null);
+  const [allowA380, setAllowA380] = useState(true);
+  const [allowA330, setAllowA330] = useState(true);
+  const [allowA350, setAllowA350] = useState(true);
+  const [hullPenalty, setHullPenalty] = useState("0");
+
+  const optimizerQuery = optionsToQuery({
+    allow_a380: allowA380,
+    allow_a330: allowA330,
+    allow_a350: allowA350,
+    hull_penalty_per_aircraft: Number(hullPenalty) || 0,
+  });
 
   const load = useCallback(async () => {
     setListLoading(true);
     setErr(null);
     try {
-      const j = await api<{ routes: SugRoute[] }>(
-        `/api/routes?status=${encodeURIComponent("suggested")}`
-      );
+      const j = await api<{ routes: SugRoute[] }>(`/api/routes?status=suggested&${optimizerQuery}`);
       const sorted = [...j.routes].sort(
         (a, b) => b.optimized.total_profit_per_week - a.optimized.total_profit_per_week
       );
@@ -44,7 +54,7 @@ export default function RouteSuggestionsPage() {
     } finally {
       setListLoading(false);
     }
-  }, []);
+  }, [optimizerQuery]);
 
   useEffect(() => {
     queueMicrotask(() => void load());
@@ -102,6 +112,29 @@ export default function RouteSuggestionsPage() {
           </Link>
         </div>
       </header>
+
+      <JwCard title="Optimizer toggles" subtitle="Play with fleet availability + deployment pressure">
+        <div className="flex w-full flex-col gap-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Toggle label="Allow A380-800" checked={allowA380} onChange={setAllowA380} />
+            <Toggle label="Allow A330-800 NEO" checked={allowA330} onChange={setAllowA330} />
+            <Toggle label="Allow A350-900 ULR" checked={allowA350} onChange={setAllowA350} />
+          </div>
+          <label className="flex w-full flex-col gap-1 text-sm">
+            <span className="text-[11px] uppercase tracking-wider text-zinc-500">Hull penalty / aircraft / week</span>
+            <input
+              type="number"
+              min={0}
+              value={hullPenalty}
+              onChange={(e) => setHullPenalty(e.target.value)}
+              className="w-full rounded-lg border border-zinc-800 bg-black/40 px-3 py-2 text-sm text-white"
+            />
+            <span className="text-[11px] text-zinc-500">
+              Subtracts a fixed weekly amount per deployed hull to favor simpler mixes.
+            </span>
+          </label>
+        </div>
+      </JwCard>
 
       {err ? (
         <p className="w-full text-sm leading-relaxed text-orange-400" role="alert">
@@ -161,7 +194,7 @@ export default function RouteSuggestionsPage() {
                 {routes.map((r) => (
                   <li key={r.id} className="border-b border-white/[0.06] last:border-b-0">
                     <Link
-                      href={`/routes/${r.id}`}
+                      href={`/routes/${r.id}?${optimizerQuery}`}
                       className="flex w-full flex-col gap-3 px-4 py-4 transition-colors hover:bg-white/[0.03] active:bg-white/[0.06] md:flex-row md:items-center md:justify-between md:gap-6 md:px-6 md:py-4"
                     >
                       <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -194,5 +227,22 @@ export default function RouteSuggestionsPage() {
         </JwCard>
       )}
     </div>
+  );
+}
+
+function Toggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-black/30 px-3 py-2">
+      <span className="text-sm text-zinc-200">{label}</span>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4" />
+    </label>
   );
 }

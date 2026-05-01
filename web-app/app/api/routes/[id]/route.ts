@@ -2,6 +2,7 @@ import { sql } from "@vercel/postgres";
 import { NextRequest, NextResponse } from "next/server";
 import { replaceRouteAssignments, type AssignmentInput } from "@/lib/assignments-sync";
 import { isValidHub } from "@/lib/hubs";
+import { optionsFromSearchParams } from "@/lib/optimizer-options";
 import { getEnrichedRouteById } from "@/lib/routes-data";
 
 export async function GET(
@@ -10,7 +11,7 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params;
-    const route = await getEnrichedRouteById(id);
+    const route = await getEnrichedRouteById(id, optionsFromSearchParams(_req.nextUrl.searchParams));
     if (!route) {
       return NextResponse.json({ error: "Route not found" }, { status: 404 });
     }

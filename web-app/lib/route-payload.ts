@@ -3,6 +3,7 @@ import {
   buildComparison,
   evaluateCurrentAssignment,
   optimizeRoute,
+  type OptimizerOptions,
   type OptimizedRouteResult,
 } from "./optimizer";
 import type { CurrentAircraftRow, Demand } from "./types";
@@ -61,7 +62,8 @@ function toOptimizedApi(opt: OptimizedRouteResult): OptimizedApi {
 export function enrichRoute(
   route: DbRoute,
   assignments: AssignmentRow[],
-  company: Company
+  company: Company,
+  optimizerOptions?: OptimizerOptions
 ): RoutePayload {
   const demand: Demand = {
     y: route.demand_y,
@@ -76,7 +78,12 @@ export function enrichRoute(
     .slice()
     .sort((a, b) => a.position - b.position)
     .map((a) => ({
-      type: (a.aircraft_type === "A330" ? "A330" : "A380") as "A380" | "A330",
+      type:
+        a.aircraft_type === "A330"
+          ? "A330"
+          : a.aircraft_type === "A350"
+            ? "A350"
+            : "A380",
       config: {
         y: a.config_y,
         j: a.config_j,
@@ -85,7 +92,7 @@ export function enrichRoute(
     }));
 
   const cur = evaluateCurrentAssignment(route.distance, demand, aircraft, company);
-  const opt = optimizeRoute(route.distance, demand, company);
+  const opt = optimizeRoute(route.distance, demand, company, optimizerOptions);
   const prices = ticketPrices(route.distance);
   const comparison = buildComparison(
     cur.total_profit_per_week,
