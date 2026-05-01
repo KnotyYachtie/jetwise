@@ -13,6 +13,7 @@
 #     directional-only → final_routes_directional.parquet
 #     csv-only         → hub_suggestions_seed.csv
 #   Workflow uses `gh release download` + GITHUB_TOKEN (works for private repos).
+#   If PIPELINE_DATA_RELEASE_TAG is set, downloads use it instead of URL secrets.
 #
 #   Creating a release (click-path summary):
 #     Releases → Draft release → choose tag / create tag → attach files → Publish.
