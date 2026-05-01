@@ -35,6 +35,16 @@ export type Position = {
   color: string;
 };
 
+type ArcDatum = Omit<Position, "color"> & {
+  color: (t: number) => string;
+};
+
+type RingDatum = {
+  lat: number;
+  lng: number;
+  color: (t: number) => string;
+};
+
 export type GlobeConfig = {
   pointSize?: number;
   globeColor?: string;
@@ -108,6 +118,25 @@ function mergeGlobeConfig(g: GlobeConfig): typeof DEFAULT_GLOBE {
   return { ...DEFAULT_GLOBE, ...g };
 }
 
+function hexToRgb(hex: string) {
+  const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+  const normalized = hex.replace(shorthandRegex, (_m, r: string, g: string, b: string) => r + r + g + g + b + b);
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(normalized);
+  return result
+    ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16),
+      }
+    : null;
+}
+
+function colorInterpolator(hex: string) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return (t: number) => `rgba(34, 211, 238, ${Math.max(0.06, 1 - t)})`;
+  return (t: number) => `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${Math.max(0.06, 1 - t)})`;
+}
+
 function Globe({ globeConfig, data }: WorldProps) {
   const globeRef = useRef<ThreeGlobe | null>(null);
   const groupRef = useRef<Group>(null);
@@ -143,7 +172,10 @@ function Globe({ globeConfig, data }: WorldProps) {
       return;
     }
 
-    const arcs = data;
+    const arcs: ArcDatum[] = data.map((arc) => ({
+      ...arc,
+      color: colorInterpolator(arc.color),
+    }));
     const points: {
       size: number;
       order: number;
@@ -154,8 +186,8 @@ function Globe({ globeConfig, data }: WorldProps) {
     for (let i = 0; i < arcs.length; i++) {
       const arc = arcs[i];
       points.push(
-        { size: cfg.pointSize, order: arc.order, color: arc.color, lat: arc.startLat, lng: arc.startLng },
-        { size: cfg.pointSize, order: arc.order, color: arc.color, lat: arc.endLat, lng: arc.endLng }
+        { size: cfg.pointSize, order: arc.order, color: data[i]?.color ?? "#22d3ee", lat: arc.startLat, lng: arc.startLng },
+        { size: cfg.pointSize, order: arc.order, color: data[i]?.color ?? "#22d3ee", lat: arc.endLat, lng: arc.endLng }
       );
     }
 
@@ -174,17 +206,17 @@ function Globe({ globeConfig, data }: WorldProps) {
       .hexPolygonColor(() => cfg.polygonColor);
 
     globeRef.current
-      .arcsData(data)
+      .arcsData(arcs)
       .arcStartLat("startLat")
       .arcStartLng("startLng")
       .arcEndLat("endLat")
       .arcEndLng("endLng")
       .arcColor("color")
       .arcAltitude("arcAlt")
-      .arcStroke(0.32)
+      .arcStroke(() => [0.28, 0.3, 0.32][Math.floor(Math.random() * 3)] as number)
       .arcDashLength(cfg.arcLength)
       .arcDashInitialGap("order")
-      .arcDashGap(15)
+      .arcDashGap(1.2)
       .arcDashAnimateTime(cfg.arcTime);
 
     globeRef.current
@@ -196,7 +228,7 @@ function Globe({ globeConfig, data }: WorldProps) {
 
     globeRef.current
       .ringsData([])
-      .ringColor(() => cfg.polygonColor)
+      .ringColor("color")
       .ringMaxRadius(cfg.maxRings)
       .ringPropagationSpeed(RING_PROPAGATION_SPEED)
       .ringRepeatPeriod((cfg.arcTime * cfg.arcLength) / cfg.rings);
@@ -217,18 +249,22 @@ function Globe({ globeConfig, data }: WorldProps) {
   useEffect(() => {
     if (!globeRef.current || !isInitialized || !data?.length) return;
 
-    const interval = setInterval(() => {
+    const pushRings = () => {
       if (!globeRef.current) return;
-      const newNumbersOfRings = genRandomNumbers(0, data.length, Math.floor((data.length * 4) / 5));
-      const ringsData = data
+      const activeCount = Math.max(1, Math.floor(data.length * 0.42));
+      const newNumbersOfRings = genRandomNumbers(0, data.length, activeCount);
+      const ringsData: RingDatum[] = data
         .filter((d, i) => newNumbersOfRings.includes(i))
         .map((d) => ({
           lat: d.startLat,
           lng: d.startLng,
-          color: d.color,
+          color: colorInterpolator(d.color),
         }));
       globeRef.current.ringsData(ringsData);
-    }, 2000);
+    };
+
+    pushRings();
+    const interval = setInterval(pushRings, 1400);
 
     return () => clearInterval(interval);
   }, [isInitialized, data]);
@@ -303,8 +339,8 @@ const JETWISE_ACETERNITY_GLOBE: GlobeConfig = {
   emissive: "#061820",
   emissiveIntensity: 0.22,
   shininess: 0.88,
-  arcTime: 3800,
-  arcLength: 0.85,
+  arcTime: 2800,
+  arcLength: 0.92,
   rings: 1,
   maxRings: 3,
   ambientLight: "#b8c4d4",
