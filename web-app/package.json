@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "pipeline": "bash ../run_pipeline.sh",
     "import-suggestions": "tsx scripts/rank-import-suggestions.ts",
     "import-airports": "node scripts/import-airports.mjs",
     "import-airports-csv": "node scripts/import-airports-slim-csv.mjs"

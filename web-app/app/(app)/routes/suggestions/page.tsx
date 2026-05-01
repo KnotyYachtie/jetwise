@@ -35,10 +35,14 @@ function fleetMixLine(rows: FleetRow[]): string {
 }
 
 export default function RouteSuggestionsPage() {
-  const [routes, setRoutes] = useState<SugRoute[] | null>(null);
+  const [routes, setRoutes] = useState<SugRoute[]>([]);
+  const [listLoading, setListLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [pipelineBusy, setPipelineBusy] = useState(false);
+  const [pipelineLog, setPipelineLog] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    setListLoading(true);
     setErr(null);
     try {
       const j = await api<{ routes: SugRoute[] }>(
@@ -50,7 +54,9 @@ export default function RouteSuggestionsPage() {
       setRoutes(sorted);
     } catch (e) {
       setErr((e as Error).message);
-      setRoutes(null);
+      setRoutes([]);
+    } finally {
+      setListLoading(false);
     }
   }, []);
 
@@ -58,43 +64,76 @@ export default function RouteSuggestionsPage() {
     queueMicrotask(() => void load());
   }, [load]);
 
-  if (err && !routes) {
-    return (
-      <JwCard title="Suggestions" subtitle="Ranked imports">
-        <p className="text-sm text-orange-400">{err}</p>
-      </JwCard>
-    );
-  }
-
-  if (!routes) {
-    return <div className="h-48 animate-pulse rounded-2xl bg-zinc-900/60 ring-1 ring-cyan-500/10" />;
+  async function runPipeline() {
+    setPipelineBusy(true);
+    setPipelineLog(null);
+    setErr(null);
+    try {
+      const res = await fetch("/api/pipeline/run", {
+        method: "POST",
+        credentials: "include",
+      });
+      const j = (await res.json()) as { ok?: boolean; log?: string; error?: string };
+      setPipelineLog(j.log ?? "");
+      if (!res.ok || !j.ok) {
+        throw new Error(j.error || `HTTP ${res.status}`);
+      }
+      await load();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setPipelineBusy(false);
+    }
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold text-white">Route suggestions</h1>
           <p className="mt-1 text-sm text-zinc-500">
             Rows with status <span className="font-mono text-zinc-400">suggested</span> — ranked by modeled optimized
-            weekly profit. Seed via Polars CSV then{" "}
-            <span className="font-mono text-xs text-cyan-400/90">npm run import-suggestions</span>.
+            weekly profit. Run the full pipeline locally (Polars + DB import) from here or{" "}
+            <span className="font-mono text-xs text-cyan-400/90">npm run pipeline</span> in{" "}
+            <span className="font-mono text-xs text-zinc-400">web-app/</span>.
           </p>
         </div>
-        <Link
-          href="/routes"
-          className="text-sm font-semibold text-cyan-400 hover:text-cyan-300 hover:underline"
-        >
-          ← All routes
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            disabled={pipelineBusy || listLoading}
+            onClick={() => void runPipeline()}
+            className="rounded-xl border border-cyan-500/45 bg-cyan-500/15 px-4 py-2 text-sm font-semibold text-cyan-100 disabled:opacity-40"
+          >
+            {pipelineBusy ? "Running pipeline…" : "Generate suggestions"}
+          </button>
+          <Link
+            href="/routes"
+            className="text-sm font-semibold text-cyan-400 hover:text-cyan-300 hover:underline"
+          >
+            ← All routes
+          </Link>
+        </div>
       </div>
 
-      {routes.length === 0 ? (
+      {err ? <p className="text-sm text-orange-400">{err}</p> : null}
+
+      {pipelineLog ? (
+        <JwCard title="Last pipeline log" subtitle="stdout/stderr combined">
+          <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-lg bg-black/40 p-3 font-mono text-[11px] leading-relaxed text-zinc-400">
+            {pipelineLog}
+          </pre>
+        </JwCard>
+      ) : null}
+
+      {listLoading ? (
+        <div className="h-48 animate-pulse rounded-2xl bg-zinc-900/60 ring-1 ring-cyan-500/10" />
+      ) : routes.length === 0 ? (
         <JwCard title="No suggestions yet" subtitle="Import pipeline">
           <p className="text-sm text-zinc-500">
-            Run <code className="text-zinc-400">build_routes.py</code>,{" "}
-            <code className="text-zinc-400">export_hub_seed.py</code>, then{" "}
-            <code className="text-zinc-400">npm run import-suggestions</code> from <code className="text-zinc-400">web-app/</code>.
+            Click <strong className="text-zinc-400">Generate suggestions</strong> (runs{" "}
+            <code className="text-zinc-400">run_pipeline.sh</code>: Parquet rebuild → hub CSV → ranked DB insert), or run{" "}
+            <code className="text-zinc-400">npm run pipeline</code> from <code className="text-zinc-400">web-app/</code>.
           </p>
         </JwCard>
       ) : (
