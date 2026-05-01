@@ -22,6 +22,10 @@
   --jw-globe-atmosphere: #22d3ee;
   --jw-globe-atmosphere-altitude: 0.18;
   --jw-globe-arc: #22d3ee;
+  /* GeoJSON land overlay (`public/globe/globe.json`) — caps / stroke */
+  --jw-globe-land-cap: rgba(34, 211, 238, 0.07);
+  --jw-globe-land-side: rgba(4, 18, 24, 0.4);
+  --jw-globe-land-stroke: rgba(34, 211, 238, 0.22);
   --jw-globe-fog: #000000;
   --jw-globe-ambient: #1a1a1e;
   --jw-globe-directional: #e4e4e7;

@@ -17,6 +17,10 @@ export const JW_TOKENS = {
     atmosphere: "rgba(34, 211, 238, 0.28)",
     atmosphereAltitude: 0.18,
     arc: "#22d3ee",
+    /** Land overlay from `public/globe/globe.json` (GeoJSON caps / stroke) */
+    landCap: "rgba(34, 211, 238, 0.07)",
+    landSide: "rgba(4, 18, 24, 0.4)",
+    landStroke: "rgba(34, 211, 238, 0.22)",
     /** Scene fog (matches app bg) */
     fog: "#000000",
     ambient: "#1a1a1e",
