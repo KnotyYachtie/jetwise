@@ -1,5 +1,28 @@
+/**
+ * =============================================================================
+ * ROUTE DETAIL PAGE — What this file is
+ * =============================================================================
+ * This is the screen you see when you open a single route (e.g. /routes/abc-123).
+ * It is a “client” page: it runs in the browser, can use buttons and links, and
+ * fetches live data from your API after the page loads.
+ *
+ * Rough layout (top → bottom):
+ *   1) Action row — Persist optimization, Edit, Delete
+ *   2) Hero card — Airport codes, names, distance, flight time, trips/week
+ *   3) Current assignment snapshot — money + per-trip blend for what you fly now
+ *   4) Optimization opportunity — model “best” fleet vs current + demand %
+ *   5) Route model context — rank among all routes, delta, demand & ticket inputs
+ *   6) Current assignment lines — one card per aircraft actually assigned
+ *   7) Optimized mix — one card per aircraft in the model’s recommended fleet
+ *
+ * Small reusable pieces at the bottom of the file:
+ *   TripCostParts, FleetLineDetail, Stat, MetricMini — building blocks for labels + numbers.
+ * =============================================================================
+ */
+
 "use client";
 
+// --- Imports: other files we depend on (UI, API helper, formatting, constants) ---
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -8,6 +31,15 @@ import { api } from "@/lib/api-client";
 import { shortenAirportHeadline } from "@/lib/airport-display-labels";
 import { pct, usd } from "@/lib/format";
 import { MAX_AIRCRAFT_PER_ROUTE } from "@/lib/optimizer";
+
+/*
+ * -----------------------------------------------------------------------------
+ * TYPE DEFINITIONS (shape of data — like a form template)
+ * -----------------------------------------------------------------------------
+ * These describe what we expect the server to send back. They don’t display
+ * anything by themselves; they help the editor catch mistakes and document fields.
+ * -----------------------------------------------------------------------------
+ */
 
 type TripCostBreakdown = {
   fuel: number;
@@ -73,7 +105,17 @@ type RouteListBench = {
   optimized: { total_profit_per_week: number };
 };
 
-/** Rotation-weighted averages across aircraft lines (same math as blended weekly totals ÷ rotations). */
+/*
+ * -----------------------------------------------------------------------------
+ * HELPER FUNCTIONS (pure math / labels — used by the main page)
+ * -----------------------------------------------------------------------------
+ */
+
+/**
+ * For each “aircraft line” we know trips/week. This builds one synthetic “average trip”
+ * by weighting each line’s per-trip numbers by how many rotations that line flies.
+ * Returns null if nothing flies (no trips/week), so the UI can hide the blended box.
+ */
 function weightedTripEconomics(rows: FleetEconomicsRow[]) {
   const rotations = rows.reduce((s, r) => s + r.trips_per_week, 0);
   if (rotations <= 0) return null;
@@ -93,24 +135,28 @@ function weightedTripEconomics(rows: FleetEconomicsRow[]) {
   };
 }
 
+/** Builds a short text like "A380×2 · A330×1" from the optimized fleet rows. */
 function fleetTypeSummary(rows: FleetEconomicsRow[]): string {
   const m = new Map<string, number>();
   for (const r of rows) m.set(r.type, (m.get(r.type) ?? 0) + 1);
   return [...m.entries()].map(([t, n]) => `${t}×${n}`).join(" · ") || "—";
 }
 
+/** Human-friendly aircraft variant for titles (e.g. card headings). */
 function aircraftVariantLabel(type: string): string {
   if (type === "A380") return "A380-800";
   if (type === "A330") return "A330-800";
   return type;
 }
 
+/** Longer marketing-style name under the variant. */
 function aircraftFullName(type: string): string {
   if (type === "A380") return "Airbus A380-800";
   if (type === "A330") return "Airbus A330-800";
   return type;
 }
 
+/** Formats money per hour; large values show as $X.Xk / hr for readability. */
 function usdKPerHour(n: number): string {
   const abs = Math.abs(n);
   const sign = n < 0 ? "-" : "";
@@ -118,14 +164,33 @@ function usdKPerHour(n: number): string {
   return `${sign}${usd(abs, { maximumFractionDigits: 0 })} / hr`;
 }
 
+/*
+ * -----------------------------------------------------------------------------
+ * MAIN PAGE COMPONENT — RouteDetailPage
+ * -----------------------------------------------------------------------------
+ * This function returns everything you see on screen. React calls it whenever
+ * state changes (e.g. after data loads).
+ * -----------------------------------------------------------------------------
+ */
 export default function RouteDetailPage() {
+  // URL → which route: /routes/[id] puts the id in the address bar; we read it here.
   const params = useParams();
   const id = String(params.id);
+  // router lets us navigate after delete (e.g. go back to the list).
   const router = useRouter();
+
+  // --- State: values that can change over time and trigger a re-render ---
+  // data = full API response for this route, or null while loading / on error.
   const [data, setData] = useState<RouteRes | null>(null);
+  // allRoutes = lightweight list of every route (for ranking this route vs others).
   const [allRoutes, setAllRoutes] = useState<RouteListBench[]>([]);
+  // err = error message string, or null if things are OK.
   const [err, setErr] = useState<string | null>(null);
 
+  /**
+   * load — Fetches this route’s details AND the full route list (for ranks).
+   * Called on first paint and whenever `id` changes.
+   */
   async function load() {
     setErr(null);
     try {
@@ -138,21 +203,28 @@ export default function RouteDetailPage() {
     }
   }
 
+  // When the page opens or the route id in the URL changes, load fresh data.
   useEffect(() => {
     void load();
   }, [id]);
 
+  /** Delete route: asks for confirmation, calls API, then returns to /routes. */
   async function remove() {
     if (!confirm("Delete this route?")) return;
     await api(`/api/routes/${id}`, { method: "DELETE" });
     router.push("/routes");
   }
 
+  /**
+   * persistOpt — Saves the optimizer’s recommended aircraft lineup to the database
+   * (server endpoint), then reloads so “current” matches what was persisted.
+   */
   async function persistOpt() {
     await api(`/api/routes/${id}/optimize`, { method: "POST" });
     await load();
   }
 
+  // --- Early exit: while loading or if the request failed, show a simple card ---
   if (err || !data) {
     return (
       <JwCard title="Route" subtitle={err ? String(err) : "Loading"}>
@@ -161,12 +233,19 @@ export default function RouteDetailPage() {
     );
   }
 
+  // --- Unpack API fields into short names used throughout the JSX below ---
   const r = data.route;
   const opt = r.optimized;
   const comp = r.comparison;
+  // economics_rows / fleet_mix = one object per aircraft line (current vs optimized).
   const currentRows = r.current.economics_rows ?? [];
   const optimizedRows = opt.fleet_mix ?? [];
 
+  /*
+   * --- Derived numbers: weekly totals and “profit per flight-hour” ---
+   * We sum (per-line stat × that line’s trips per week) to get fleet-level weekly
+   * revenue/cost/hours on this route. Profit/hour = weekly profit ÷ weekly flight hours.
+   */
   const currentRevenuePerWeek = currentRows.reduce(
     (sum, row) => sum + row.revenue_per_flight * row.trips_per_week,
     0
@@ -198,9 +277,14 @@ export default function RouteDetailPage() {
     optimizedFlightHoursPerWeek > 0 ? opt.total_profit_per_week / optimizedFlightHoursPerWeek : 0;
   const configLeakPerWeek = (opt.total_profit_per_week ?? 0) - (r.current.weekly_profit_per_week ?? 0);
 
+  // Blended “typical trip” economics (weighted by how often each line flies per week).
   const currentTripBlend = weightedTripEconomics(currentRows);
   const optimizedTripBlend = weightedTripEconomics(optimizedRows);
 
+  /*
+   * --- Rankings: sort all routes by weekly profit, find this route’s position ---
+   * Ranks are 1-based (#1 = best). routeCount avoids divide-by-zero in labels.
+   */
   const sortableCurrent = allRoutes
     .map((x) => ({ id: x.id, value: x.current?.weekly_profit_per_week ?? 0 }))
     .sort((a, b) => b.value - a.value);
@@ -213,6 +297,7 @@ export default function RouteDetailPage() {
   const currentRankLabel = currentRank > 0 ? `#${currentRank}/${routeCount}` : "—";
   const optimizedRankLabel = optimizedRank > 0 ? `#${optimizedRank}/${routeCount}` : "—";
 
+  // Optional prettier airport names (shortened) when the API resolved them from the DB.
   const originHeadline =
     r.origin_airport_name != null && r.origin_airport_name !== ""
       ? shortenAirportHeadline(r.origin_airport_name)
@@ -222,8 +307,13 @@ export default function RouteDetailPage() {
       ? shortenAirportHeadline(r.destination_airport_name)
       : null;
 
+  // --- Main page markup (JSX): HTML-like structure; className = visual styling ---
   return (
     <div className="space-y-4">
+      {/* ================================================================
+          TOP TOOLBAR — Actions (not part of the big hero card)
+          Persist = write optimizer result to DB; Edit = open composer; Delete = remove route
+          ================================================================ */}
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -247,7 +337,11 @@ export default function RouteDetailPage() {
         </button>
       </div>
 
+      {/* ================================================================
+          HERO CARD — Whole route story in one framed block (gradient border, blur)
+          ================================================================ */}
       <section className="overflow-hidden rounded-3xl border border-cyan-500/20 bg-[linear-gradient(160deg,rgba(6,18,24,0.96),rgba(5,13,20,0.92))] shadow-[0_0_90px_-30px_rgba(34,211,238,0.35)] backdrop-blur-xl">
+        {/* Hero header strip: hub label, origin ↔ plane icon ↔ destination, distance & schedule */}
         <div className="relative border-b border-cyan-500/20 bg-[radial-gradient(120%_90%_at_50%_120%,rgba(28,190,196,0.33),transparent_62%),linear-gradient(180deg,rgba(11,28,39,0.98)_0%,rgba(8,23,31,0.92)_45%,rgba(8,45,53,0.72)_100%)] p-4 sm:p-6">
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-7 bg-gradient-to-t from-cyan-300/10 to-transparent" />
           <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-400">{r.hub ?? "Unassigned hub"}</p>
@@ -285,9 +379,12 @@ export default function RouteDetailPage() {
           </p>
         </div>
 
+        {/* Body of the hero: stacked sections with dividers */}
         <div className="space-y-6 p-4 sm:p-6">
+          {/* --- Section A: What you make now (totals + weighted per-trip breakdown) --- */}
           <section>
             <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Current assignment snapshot</p>
+            {/* Four headline numbers: weekly roll-ups + profit per block hour in the air */}
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               <Stat title="Revenue / wk" value={usd(currentRevenuePerWeek)} />
               <Stat title="Cost / wk" value={usd(currentCostPerWeek)} />
@@ -311,8 +408,10 @@ export default function RouteDetailPage() {
             ) : null}
           </section>
 
+          {/* --- Section B: Model optimum vs today (leak, profit/hr, demand %) --- */}
           <section className="border-t border-zinc-800/80 pt-5">
             <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Optimization opportunity</p>
+            {/* Optimized weekly profit, money left on table, model profit/hour, demand % before→after */}
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               <Stat title="Optimized profit / wk" value={usd(opt.total_profit_per_week)} />
               <Stat title="Leak vs current / wk" value={usd(configLeakPerWeek)} highlight />
@@ -336,6 +435,7 @@ export default function RouteDetailPage() {
             ) : null}
           </section>
 
+          {/* --- Section C: How this route ranks fleet-wide + inputs the model used --- */}
           <section className="border-t border-zinc-800/80 pt-5">
             <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Route model context</p>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -349,9 +449,11 @@ export default function RouteDetailPage() {
             </p>
           </section>
 
+          {/* --- Section D: One card per aircraft actually assigned (from DB) --- */}
           <section className="border-t border-zinc-800/80 pt-5">
             <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Current assignment lines</p>
             <ul className="mt-3 grid grid-cols-2 gap-2 text-sm">
+              {/* map = “for each aircraft row, draw one FleetLineDetail card” */}
               {currentRows.length ? (
                 currentRows.map((a, i) => (
                   <FleetLineDetail
@@ -369,12 +471,13 @@ export default function RouteDetailPage() {
             </ul>
           </section>
 
+          {/* --- Section E: One card per aircraft in the solver’s recommended mix --- */}
           <section className="border-t border-zinc-800/80 pt-5">
             <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Optimized mix</p>
             <p className="mt-1 text-xs text-zinc-400">
-              {fleetTypeSummary(optimizedRows)} · Deploy cap {MAX_AIRCRAFT_PER_ROUTE} · Marginal A330 {usd(opt.marginal_a330_value)} · A380 {usd(opt.marginal_a380_value)}
-            </p>
+              {fleetTypeSummary(optimizedRows)} </p>
             <ul className="mt-3 grid grid-cols-2 gap-2 text-sm">
+              {/* Same pattern as current lines, but data comes from the solver’s fleet_mix */}
               {opt.fleet_mix.length ? (
                 opt.fleet_mix.map((a, i) => (
                   <FleetLineDetail
@@ -397,6 +500,16 @@ export default function RouteDetailPage() {
   );
 }
 
+/*
+ * -----------------------------------------------------------------------------
+ * SMALL UI COMPONENTS (building blocks — used multiple times on this page)
+ * -----------------------------------------------------------------------------
+ */
+
+/**
+ * Lists the four cost buckets (fuel, CO₂, A-Check, repair) under “Cost / trip”
+ * in the blended summary boxes. `accent` only changes text color (cyan vs zinc).
+ */
 function TripCostParts({
   bd,
   accent = "zinc",
@@ -427,6 +540,10 @@ function TripCostParts({
   );
 }
 
+/**
+ * One aircraft “line” card: title, cabin counts, ticket prices, trip stats,
+ * gross / cost / net per trip and per week. `variant` picks muted vs cyan styling.
+ */
 function FleetLineDetail({
   row,
   variant,
@@ -486,9 +603,11 @@ function FleetLineDetail({
   );
 }
 
+/** Simple labeled box: small CAPS label on top, big monospace value below. */
 function Stat({
   title,
   value,
+  /** When true, value text uses cyan accent (used for “important” deltas). */
   highlight = false,
 }: {
   title: string;
@@ -503,6 +622,7 @@ function Stat({
   );
 }
 
+/** Compact label + value (used inside the blended per-trip rows). */
 function MetricMini({
   title,
   value,
