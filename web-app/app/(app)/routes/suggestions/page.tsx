@@ -25,6 +25,7 @@ export default function RouteSuggestionsPage() {
   const [routes, setRoutes] = useState<SugRoute[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [pipelineEnvNote, setPipelineEnvNote] = useState<string | null>(null);
   const [pipelineBusy, setPipelineBusy] = useState(false);
   const [pipelineLog, setPipelineLog] = useState<string | null>(null);
   const [allowA380, setAllowA380] = useState(true);
@@ -64,6 +65,7 @@ export default function RouteSuggestionsPage() {
     setPipelineBusy(true);
     setPipelineLog(null);
     setErr(null);
+    setPipelineEnvNote(null);
     try {
       const res = await fetch("/api/pipeline/run", {
         method: "POST",
@@ -71,6 +73,10 @@ export default function RouteSuggestionsPage() {
       });
       const j = (await res.json()) as { ok?: boolean; log?: string; error?: string };
       setPipelineLog(j.log ?? "");
+      if (res.status === 503 && j.error) {
+        setPipelineEnvNote(j.error);
+        return;
+      }
       if (!res.ok || !j.ok) {
         throw new Error(j.error || `HTTP ${res.status}`);
       }
@@ -135,6 +141,12 @@ export default function RouteSuggestionsPage() {
           </label>
         </div>
       </JwCard>
+
+      {pipelineEnvNote ? (
+        <JwCard title="Pipeline not available on this host" subtitle="Expected on Vercel / serverless">
+          <p className="text-sm leading-relaxed text-amber-200/90">{pipelineEnvNote}</p>
+        </JwCard>
+      ) : null}
 
       {err ? (
         <p className="w-full text-sm leading-relaxed text-orange-400" role="alert">
