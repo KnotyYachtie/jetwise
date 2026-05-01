@@ -7,7 +7,7 @@ import { RouteRevenueEfficiencyRing } from "@/components/RouteRevenueEfficiencyR
 import { shortenAirportHeadline } from "@/lib/airport-display-labels";
 import { api } from "@/lib/api-client";
 import { MINUTES_PER_WEEK } from "@/lib/economics";
-import { usd } from "@/lib/format";
+import { usd, usdAbbrev } from "@/lib/format";
 
 type RouteList = {
   id: string;
@@ -184,7 +184,7 @@ export default function RoutesListPage() {
                           delta >= 0 ? "font-mono text-lg text-emerald-400" : "font-mono text-lg text-orange-400"
                         }
                       >
-                        {usd(delta)}
+                        {usdAbbrev(delta)}
                       </p>
                     </div>
                     <RouteRevenueEfficiencyRing
@@ -194,23 +194,23 @@ export default function RoutesListPage() {
                     />
                   </div>
                 </div>
-                <div className="mt-4 grid gap-3 border-t border-zinc-800 pt-4 text-sm sm:grid-cols-2">
-                  <Stat label="Current / wk" value={usd(r.current?.weekly_profit_per_week ?? 0)} />
-                  <Stat label="Optimized / wk" value={usd(r.optimized.total_profit_per_week)} />
+                <div className="mt-4 grid grid-cols-1 gap-3 border-t border-zinc-800 pt-4 text-sm sm:grid-cols-2">
+                  <Stat label="Current / wk" value={usdAbbrev(r.current?.weekly_profit_per_week ?? 0)} />
+                  <Stat label="Optimized / wk" value={usdAbbrev(r.optimized.total_profit_per_week)} />
                   <Stat
                     label="Current / hr"
-                    value={usd(curHr, { maximumFractionDigits: 0 })}
+                    value={usdAbbrev(curHr)}
                     meta={total > 0 ? `${currentRankById.get(r.id) ?? "—"}/${total}` : undefined}
                   />
                   <Stat
                     label="Optimized / hr"
-                    value={usd(optHr, { maximumFractionDigits: 0 })}
+                    value={usdAbbrev(optHr)}
                     meta={total > 0 ? `${optimizedRankById.get(r.id) ?? "—"}/${total}` : undefined}
                   />
                 </div>
                 <div className="mt-3 text-xs text-zinc-400">
-                  Ticket prices · Y {usd(r.prices?.y ?? 0)} · J {usd(r.prices?.j ?? 0)} · F{" "}
-                  {usd(r.prices?.f ?? 0)}
+                  Ticket prices · Y {usdAbbrev(r.prices?.y ?? 0)} · J {usdAbbrev(r.prices?.j ?? 0)} · F{" "}
+                  {usdAbbrev(r.prices?.f ?? 0)}
                 </div>
               </article>
             </Link>

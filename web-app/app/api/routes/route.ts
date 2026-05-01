@@ -11,6 +11,8 @@ export async function GET(req: NextRequest) {
     let routes = await getEnrichedRoutes();
     if (status) {
       routes = routes.filter((r) => r.status === status);
+    } else {
+      routes = routes.filter((r) => r.status !== "suggested");
     }
     return NextResponse.json({ routes });
   } catch (err) {

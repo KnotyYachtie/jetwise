@@ -1,6 +1,6 @@
 /**
- * Rank hub seed CSV rows by optimizeRoute weekly profit, insert top routes as status=suggested,
- * and persist optimizer fleet_mix as route_assignments.
+ * Rank hub seed CSV rows by optimizeRoute weekly profit, insert top routes as status=suggested.
+ * Does not write route_assignments — ideas stay unassigned until the user adopts them on a tracked route.
  *
  * Usage (from web-app/): load `.env.local` with Postgres URL.
  *   npx tsx scripts/rank-import-suggestions.ts [path/to/hub_suggestions_seed.csv]
@@ -16,7 +16,6 @@ import { join } from "node:path";
 import { parse } from "csv-parse/sync";
 import { config } from "dotenv";
 import { sql } from "@vercel/postgres";
-import { replaceRouteAssignments } from "@/lib/assignments-sync";
 import { getCompany } from "@/lib/company";
 import { HUB_ICAOS } from "@/lib/hubs";
 import { optimizeRoute } from "@/lib/optimizer";
@@ -142,14 +141,6 @@ async function main() {
         NOW()
       )
     `;
-
-    await replaceRouteAssignments(
-      id,
-      row.opt.fleet_mix.map((r) => ({
-        type: r.type === "A330" ? "A330" : "A380",
-        config: r.config,
-      }))
-    );
 
     inserted += 1;
     console.log(

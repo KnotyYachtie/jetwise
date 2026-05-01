@@ -25,11 +25,11 @@
 // --- Imports: other files we depend on (UI, API helper, formatting, constants) ---
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { JwCard } from "@/components/JwCard";
 import { api } from "@/lib/api-client";
 import { shortenAirportHeadline } from "@/lib/airport-display-labels";
-import { pct, usd } from "@/lib/format";
+import { pct, usd, usdAbbrev } from "@/lib/format";
 import { MAX_AIRCRAFT_PER_ROUTE } from "@/lib/optimizer";
 
 /*
@@ -182,6 +182,18 @@ function usdKPerHour(n: number): string {
   return `${sign}${usd(abs, { maximumFractionDigits: 0 })} / hr`;
 }
 
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="mb-3 border-l-2 border-cyan-500/35 pl-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">
+      {children}
+    </p>
+  );
+}
+
+function BlendTripColumn({ children }: { children: ReactNode }) {
+  return <div className="mt-3 flex flex-col gap-3">{children}</div>;
+}
+
 /*
  * -----------------------------------------------------------------------------
  * MAIN PAGE COMPONENT — RouteDetailPage
@@ -310,14 +322,27 @@ export default function RouteDetailPage() {
   const optimizedRankLabel = optimizedRank > 0 ? `#${optimizedRank}/${routeCount}` : "—";
 
   // Optional prettier airport names (shortened) when the API resolved them from the DB.
-  const originHeadline =
+  const originHeadlineRaw =
     r.origin_airport_name != null && r.origin_airport_name !== ""
       ? shortenAirportHeadline(r.origin_airport_name)
       : null;
-  const destHeadline =
+  const destHeadlineRaw =
     r.destination_airport_name != null && r.destination_airport_name !== ""
       ? shortenAirportHeadline(r.destination_airport_name)
       : null;
+  /** Omit subtitles that only repeat the ICAO — saves vertical noise on phones. */
+  const originHeadline =
+    originHeadlineRaw &&
+    originHeadlineRaw.replace(/\s+/g, "").toUpperCase() !== r.origin.replace(/\s+/g, "").toUpperCase()
+      ? originHeadlineRaw
+      : null;
+  const destHeadline =
+    destHeadlineRaw &&
+    destHeadlineRaw.replace(/\s+/g, "").toUpperCase() !== r.destination.replace(/\s+/g, "").toUpperCase()
+      ? destHeadlineRaw
+      : null;
+  const hubBanner =
+    r.hub && r.hub !== r.origin && r.hub !== r.destination ? `Hub ${r.hub}` : null;
 
   // --- Main page markup (JSX): HTML-like structure; className = visual styling ---
   return (
@@ -330,20 +355,20 @@ export default function RouteDetailPage() {
         <button
           type="button"
           onClick={() => void persistOpt()}
-          className="rounded-xl border border-cyan-400/40 bg-cyan-500/15 px-3 py-1.5 text-sm font-semibold text-cyan-100"
+          className="min-h-11 rounded-xl border border-cyan-400/40 bg-cyan-500/15 px-4 py-2.5 text-sm font-semibold text-cyan-100"
         >
           Persist optimization
         </button>
         <Link
           href={`/routes/new?edit=${r.id}`}
-          className="rounded-xl border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300"
+          className="flex min-h-11 items-center rounded-xl border border-zinc-700 px-4 py-2.5 text-sm text-zinc-300"
         >
           Edit
         </Link>
         <button
           type="button"
           onClick={() => void remove()}
-          className="rounded-xl border border-orange-500/40 px-3 py-1.5 text-sm text-orange-300"
+          className="min-h-11 rounded-xl border border-orange-500/40 px-4 py-2.5 text-sm text-orange-300"
         >
           Delete
         </button>
@@ -356,13 +381,17 @@ export default function RouteDetailPage() {
         {/* Hero header strip: hub label, origin ↔ plane icon ↔ destination, distance & schedule */}
         <div className="relative border-b border-cyan-500/20 bg-[radial-gradient(120%_90%_at_50%_120%,rgba(28,190,196,0.33),transparent_62%),linear-gradient(180deg,rgba(11,28,39,0.98)_0%,rgba(8,23,31,0.92)_45%,rgba(8,45,53,0.72)_100%)] p-4 sm:p-6">
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-7 bg-gradient-to-t from-cyan-300/10 to-transparent" />
-          <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-400">{r.hub ?? "Unassigned hub"}</p>
-          <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-            <div>
+          <p className="text-[11px] uppercase tracking-[0.2em] text-zinc-400">
+            {hubBanner ?? (r.hub ? `${r.hub} · hub leg` : "No hub")}
+          </p>
+          <div className="mt-3 flex flex-col items-stretch gap-5 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-3">
+            <div className="text-center sm:text-left">
               <p className="font-mono text-3xl font-semibold tracking-wide text-white">{r.origin}</p>
-              <p className="mt-1 text-xs text-zinc-300">📍 {originHeadline ?? r.origin}</p>
+              {originHeadline ? (
+                <p className="mt-1 text-sm text-zinc-400">📍 {originHeadline}</p>
+              ) : null}
             </div>
-            <div className="flex min-w-[88px] flex-col items-center justify-center">
+            <div className="flex min-h-[3rem] min-w-[88px] flex-col items-center justify-center sm:min-h-0">
               <div className="h-px w-full bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" />
               <div className="-mt-2 rounded-full border border-cyan-300/55 bg-[#06131c]/80 p-1.5 shadow-[0_0_18px_-8px_rgba(34,211,238,0.8)]">
                 <svg
@@ -380,91 +409,106 @@ export default function RouteDetailPage() {
               </div>
               <div className="-mt-2 h-px w-full bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" />
             </div>
-            <div className="text-right">
+            <div className="text-center sm:text-right">
               <p className="font-mono text-3xl font-semibold tracking-wide text-white">{r.destination}</p>
-              <p className="mt-1 text-xs text-zinc-300">📍 {destHeadline ?? r.destination}</p>
+              {destHeadline ? (
+                <p className="mt-1 text-sm text-zinc-400">📍 {destHeadline}</p>
+              ) : null}
             </div>
           </div>
-            <p className="mt-3 text-sm text-zinc-300">
-            {Math.round(r.distance)} km · {opt.scheduling.flight_time_hours.toFixed(2)}h one-way · trips/wk{" "}
-            {opt.scheduling.trips_per_week}
+          <p className="mt-4 text-[15px] leading-snug text-zinc-300">
+            {Math.round(r.distance)} km · {opt.scheduling.flight_time_hours.toFixed(2)}h block ·{" "}
+            {opt.scheduling.trips_per_week} trips/wk
           </p>
         </div>
 
         {/* Body of the hero: stacked sections with dividers */}
-        <div className="space-y-6 p-4 sm:p-6">
+        <div className="space-y-8 p-4 sm:space-y-7 sm:p-6">
           {/* --- Section A: What you make now (totals + weighted per-trip breakdown) --- */}
           <section>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Current assignment snapshot</p>
-            {/* Four headline numbers: weekly roll-ups + profit per block hour in the air */}
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <Stat title="Revenue / wk" value={usd(currentRevenuePerWeek)} />
-              <Stat title="Cost / wk" value={usd(currentCostPerWeek)} />
-              <Stat title="Profit / wk" value={usd(r.current.weekly_profit_per_week ?? 0)} />
-              <Stat title="Profit / flight-hour" value={usd(currentProfitPerHour)} />
+            <SectionLabel>Current assignment snapshot</SectionLabel>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <Stat title="Revenue / wk" value={usdAbbrev(currentRevenuePerWeek)} />
+              <Stat title="Cost / wk" value={usdAbbrev(currentCostPerWeek)} />
+              <Stat title="Profit / wk" value={usdAbbrev(r.current.weekly_profit_per_week ?? 0)} />
+              <Stat title="Profit / flight-hour" value={usdAbbrev(currentProfitPerHour)} />
             </div>
             {currentTripBlend ? (
-              <div className="mt-3 rounded-xl border border-zinc-800/90 bg-black/25 p-3">
-                <p className="text-[10px] uppercase tracking-widest text-zinc-500">
-                  Per trip · weighted by {currentTripBlend.rotations_per_week.toFixed(0)} rotations / wk
+              <div className="mt-4 rounded-xl border border-zinc-800/90 bg-black/25 p-4">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+                  Blended trip ({currentTripBlend.rotations_per_week.toFixed(0)} rotations/wk)
                 </p>
-                <div className="mt-2 grid gap-3 sm:grid-cols-3">
-                  <MetricMini title="Gross / trip" value={usd(currentTripBlend.gross_per_trip)} />
-                  <div>
-                    <MetricMini title="Cost / trip" value={usd(currentTripBlend.cost_per_trip)} />
+                <BlendTripColumn>
+                  <MetricMini title="Gross / trip" value={usdAbbrev(currentTripBlend.gross_per_trip)} />
+                  <div className="border-t border-zinc-800/70 pt-3">
+                    <MetricMini title="Cost / trip" value={usdAbbrev(currentTripBlend.cost_per_trip)} />
                     <TripCostParts bd={currentTripBlend.breakdown} />
                   </div>
-                  <MetricMini title="Net / trip" value={usd(currentTripBlend.net_per_trip)} tone="good" />
-                </div>
+                  <div className="border-t border-zinc-800/70 pt-3">
+                    <MetricMini title="Net / trip" value={usdAbbrev(currentTripBlend.net_per_trip)} tone="good" />
+                  </div>
+                </BlendTripColumn>
               </div>
             ) : null}
           </section>
 
           {/* --- Section B: Model optimum vs today (leak, profit/hr, demand %) --- */}
-          <section className="border-t border-zinc-800/80 pt-5">
-            <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Optimization opportunity</p>
-            {/* Optimized weekly profit, money left on table, model profit/hour, demand % before→after */}
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <Stat title="Optimized profit / wk" value={usd(opt.total_profit_per_week)} />
-              <Stat title="Leak vs current / wk" value={usd(configLeakPerWeek)} highlight />
-              <Stat title="Optimized profit / flight-hour" value={usd(optimizedProfitPerHour)} />
+          <section className="border-t border-zinc-800/80 pt-6">
+            <SectionLabel>Optimization opportunity</SectionLabel>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <Stat title="Optimized profit / wk" value={usdAbbrev(opt.total_profit_per_week)} />
+              <Stat title="Leak vs current / wk" value={usdAbbrev(configLeakPerWeek)} highlight />
+              <Stat title="Optimized profit / flight-hour" value={usdAbbrev(optimizedProfitPerHour)} />
               <Stat title="Demand fulfilled" value={`${pct(comp.current_demand_fulfilled)} → ${pct(comp.optimized_demand_fulfilled)}`} />
             </div>
             {optimizedTripBlend ? (
-              <div className="mt-3 rounded-xl border border-cyan-400/25 bg-cyan-400/[0.06] p-3">
-                <p className="text-[10px] uppercase tracking-widest text-cyan-100/85">
-                  Optimized per trip · weighted by {optimizedTripBlend.rotations_per_week.toFixed(0)} rotations / wk
+              <div className="mt-4 rounded-xl border border-cyan-400/25 bg-cyan-400/[0.06] p-4">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-cyan-100/90">
+                  Modeled optimal trip ({optimizedTripBlend.rotations_per_week.toFixed(0)} rotations/wk)
                 </p>
-                <div className="mt-2 grid gap-3 sm:grid-cols-3">
-                  <MetricMini title="Gross / trip" value={usd(optimizedTripBlend.gross_per_trip)} />
-                  <div>
-                    <MetricMini title="Cost / trip" value={usd(optimizedTripBlend.cost_per_trip)} />
+                <BlendTripColumn>
+                  <MetricMini title="Gross / trip" value={usdAbbrev(optimizedTripBlend.gross_per_trip)} />
+                  <div className="border-t border-cyan-500/15 pt-3">
+                    <MetricMini title="Cost / trip" value={usdAbbrev(optimizedTripBlend.cost_per_trip)} />
                     <TripCostParts bd={optimizedTripBlend.breakdown} accent="cyan" />
                   </div>
-                  <MetricMini title="Net / trip" value={usd(optimizedTripBlend.net_per_trip)} tone="good" />
-                </div>
+                  <div className="border-t border-cyan-500/15 pt-3">
+                    <MetricMini title="Net / trip" value={usdAbbrev(optimizedTripBlend.net_per_trip)} tone="good" />
+                  </div>
+                </BlendTripColumn>
               </div>
             ) : null}
           </section>
 
           {/* --- Section C: How this route ranks fleet-wide + inputs the model used --- */}
-          <section className="border-t border-zinc-800/80 pt-5">
-            <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Route model context</p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <section className="border-t border-zinc-800/80 pt-6">
+            <SectionLabel>Route model context</SectionLabel>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Stat title="Current rank" value={currentRankLabel} />
               <Stat title="Optimized rank" value={optimizedRankLabel} />
-              <Stat title="Delta vs current" value={usd(comp.delta_per_week)} highlight />
+              <Stat title="Delta vs current" value={usdAbbrev(comp.delta_per_week)} highlight />
               <Stat title="Bracket (~daily eq)" value={String(opt.scheduling.trip_bracket)} />
             </div>
-            <p className="mt-3 text-xs text-zinc-400">
-              Demand (24h) Y {r.demand.y} · J {r.demand.j} · F {r.demand.f} · Ticket Y {usd(r.prices.y)} · J {usd(r.prices.j)} · F {usd(r.prices.f)}
-            </p>
+            <dl className="mt-4 grid gap-2 rounded-xl border border-zinc-800/60 bg-black/20 px-4 py-3 text-[13px] text-zinc-400">
+              <div className="flex flex-wrap justify-between gap-x-4 gap-y-1">
+                <dt className="text-zinc-500">Demand (24h)</dt>
+                <dd className="font-mono text-zinc-300">
+                  Y{r.demand.y} · J{r.demand.j} · F{r.demand.f}
+                </dd>
+              </div>
+              <div className="flex flex-wrap justify-between gap-x-4 gap-y-1 border-t border-zinc-800/60 pt-2">
+                <dt className="text-zinc-500">Tickets</dt>
+                <dd className="text-right font-mono text-zinc-300">
+                  Y {usdAbbrev(r.prices.y)} · J {usdAbbrev(r.prices.j)} · F {usdAbbrev(r.prices.f)}
+                </dd>
+              </div>
+            </dl>
           </section>
 
           {/* --- Section D: One card per aircraft actually assigned (from DB) --- */}
-          <section className="border-t border-zinc-800/80 pt-5">
-            <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Current assignment lines</p>
-            <ul className="mt-3 grid grid-cols-2 gap-2 text-sm">
+          <section className="border-t border-zinc-800/80 pt-6">
+            <SectionLabel>Current assignment lines</SectionLabel>
+            <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {/* map = “for each aircraft row, draw one FleetLineDetail card” */}
               {currentRows.length ? (
                 currentRows.map((a, i) => (
@@ -484,12 +528,13 @@ export default function RouteDetailPage() {
           </section>
 
           {/* --- Section E: One card per aircraft in the solver’s recommended mix --- */}
-          <section className="border-t border-zinc-800/80 pt-5">
-            <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Optimized mix</p>
-            <p className="mt-1 text-xs text-zinc-400">
-              {optimizedMixLineSummary(optimizedRows)} · Deploy cap {MAX_AIRCRAFT_PER_ROUTE} · Marginal A330 {usd(opt.marginal_a330_value)} · A380 {usd(opt.marginal_a380_value)}
+          <section className="border-t border-zinc-800/80 pt-6">
+            <SectionLabel>Optimal assignment (modeled)</SectionLabel>
+            <p className="mb-3 text-[13px] leading-relaxed text-zinc-400">
+              {optimizedMixLineSummary(optimizedRows)} · cap {MAX_AIRCRAFT_PER_ROUTE} hull · marginal A330{" "}
+              {usdAbbrev(opt.marginal_a330_value)} · A380 {usdAbbrev(opt.marginal_a380_value)}
             </p>
-            <ul className="mt-3 grid grid-cols-2 gap-2 text-sm">
+            <ul className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {/* Same pattern as current lines, but data comes from the solver’s fleet_mix */}
               {opt.fleet_mix.length ? (
                 opt.fleet_mix.map((a, i) => (
@@ -523,6 +568,10 @@ export default function RouteDetailPage() {
  * Lists the four cost buckets (fuel, CO₂, A-Check, repair) under “Cost / trip”
  * in the blended summary boxes. `accent` only changes text color (cyan vs zinc).
  */
+function moneyScan(n: number): string {
+  return Math.abs(n) >= 100_000 ? usdAbbrev(n) : usd(n, { maximumFractionDigits: 0 });
+}
+
 function TripCostParts({
   bd,
   accent = "zinc",
@@ -532,22 +581,22 @@ function TripCostParts({
 }) {
   const val = accent === "cyan" ? "text-cyan-100/90" : "text-zinc-300";
   return (
-    <ul className="mt-2 space-y-1 border-t border-zinc-800/80 pt-2 text-[11px] text-zinc-500">
+    <ul className="mt-2 grid gap-1 border-t border-zinc-800/80 pt-2 text-[12px] text-zinc-500">
       <li className="flex justify-between gap-3">
         <span>Fuel</span>
-        <span className={`font-mono ${val}`}>{usd(bd.fuel)}</span>
+        <span className={`tabular-nums ${val}`}>{moneyScan(bd.fuel)}</span>
       </li>
       <li className="flex justify-between gap-3">
         <span>CO₂</span>
-        <span className={`font-mono ${val}`}>{usd(bd.co2)}</span>
+        <span className={`tabular-nums ${val}`}>{moneyScan(bd.co2)}</span>
       </li>
       <li className="flex justify-between gap-3">
         <span>A-Check</span>
-        <span className={`font-mono ${val}`}>{usd(bd.acheck)}</span>
+        <span className={`tabular-nums ${val}`}>{moneyScan(bd.acheck)}</span>
       </li>
       <li className="flex justify-between gap-3">
         <span>Repair</span>
-        <span className={`font-mono ${val}`}>{usd(bd.repair)}</span>
+        <span className={`tabular-nums ${val}`}>{moneyScan(bd.repair)}</span>
       </li>
     </ul>
   );
@@ -572,43 +621,47 @@ function FleetLineDetail({
 }) {
   const wrap =
     variant === "optimized"
-      ? "rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-2.5 text-cyan-50"
-      : "rounded-lg border border-zinc-800 bg-black/30 p-2.5 text-zinc-200";
-  const sub = "text-zinc-400";
+      ? "rounded-xl border border-cyan-500/20 bg-cyan-500/5 text-cyan-50"
+      : "rounded-xl border border-zinc-800 bg-black/30 text-zinc-200";
   const bd = row.cost_breakdown;
   return (
-    <li className={`${wrap} font-mono text-xs`}>
-      <div className="text-[13px] leading-snug text-white/90">{title}</div>
+    <li className={`${wrap} p-3 font-mono text-xs`}>
+      <div className="text-[14px] font-semibold leading-snug text-white/90">{title}</div>
       <div className="mt-0.5 text-[11px] text-zinc-400">{subtitle}</div>
-      <div className="mt-1 text-[11px] text-zinc-300">
-        Y{row.config.y} J{row.config.j} F{row.config.f}
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-zinc-300">
+        <span>
+          Y{row.config.y} J{row.config.j} F{row.config.f}
+        </span>
+        <span className="text-zinc-500">·</span>
+        <span>
+          {row.trips_per_week} trips/wk · {row.flight_time_hours.toFixed(2)}h · {usdKPerHour(row.profit_per_hour)}
+        </span>
       </div>
-      <div className="mt-0.5 text-[10px] text-zinc-500">
-        Ticket prices Y {usd(prices.y)} · J {usd(prices.j)} · F {usd(prices.f)}
-      </div>
-      <div className={`mt-1 text-[11px] ${sub}`}>
-        {row.trips_per_week} t/wk · {row.flight_time_hours.toFixed(2)}h · {usdKPerHour(row.profit_per_hour)}
-      </div>
-      <div className="mt-2 grid gap-2">
-        <div>
-          <p className="text-[10px] uppercase tracking-wide text-zinc-500">Gross / trip</p>
-          <p className="mt-0.5 font-mono text-[13px] text-zinc-100">{usd(row.revenue_per_flight)}</p>
+      <p className="mt-2 text-[11px] text-zinc-500">
+        Tickets Y {usdAbbrev(prices.y)} · J {usdAbbrev(prices.j)} · F {usdAbbrev(prices.f)}
+      </p>
+      <div className="mt-3 space-y-3 border-t border-zinc-800/50 pt-3">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[11px] uppercase tracking-wide text-zinc-500">Gross / trip</span>
+          <span className="tabular-nums text-[15px] text-zinc-100">{usdAbbrev(row.revenue_per_flight)}</span>
         </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-wide text-zinc-500">Cost / trip</p>
-          <p className="mt-0.5 font-mono text-[13px]">{usd(row.cost_per_flight)}</p>
-          <p className="mt-1 text-[10px] leading-relaxed text-zinc-500">
-            Fuel {usd(bd.fuel)} · CO₂ {usd(bd.co2)} · A-Check {usd(bd.acheck)} · Repair {usd(bd.repair)}
+        <div className="flex flex-col gap-1">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-[11px] uppercase tracking-wide text-zinc-500">Cost / trip</span>
+            <span className="tabular-nums text-[15px] text-zinc-200">{usdAbbrev(row.cost_per_flight)}</span>
+          </div>
+          <p className="text-[11px] leading-relaxed text-zinc-500">
+            Fuel {moneyScan(bd.fuel)} · CO₂ {moneyScan(bd.co2)} · Maint {moneyScan(bd.acheck + bd.repair)}
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-          <p className="text-[10px] uppercase tracking-wide text-zinc-500">Net / trip</p>
-            <p className="mt-0.5 font-mono text-[13px] text-emerald-200/90">{usd(row.profit_per_flight)}</p>
+        <div className="flex flex-col gap-2 border-t border-zinc-800/50 pt-3">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-[11px] uppercase tracking-wide text-zinc-500">Net / trip</span>
+            <span className="tabular-nums text-[15px] font-medium text-emerald-200/95">{usdAbbrev(row.profit_per_flight)}</span>
           </div>
-          <div>
-          <p className="text-[10px] uppercase tracking-wide text-zinc-500">Net / week</p>
-            <p className="mt-0.5 font-mono text-[13px] text-emerald-200/90">{usd(row.profit_per_week)}</p>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-[11px] uppercase tracking-wide text-zinc-500">Net / week</span>
+            <span className="tabular-nums text-[15px] font-medium text-emerald-200/95">{usdAbbrev(row.profit_per_week)}</span>
           </div>
         </div>
       </div>
@@ -628,9 +681,17 @@ function Stat({
   highlight?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-zinc-800/80 bg-black/20 p-3">
-      <p className="text-[10px] uppercase tracking-widest text-zinc-500">{title}</p>
-      <p className={highlight ? "mt-1 font-mono text-cyan-200" : "mt-1 font-mono text-zinc-200"}>{value}</p>
+    <div className="rounded-xl border border-zinc-800/80 bg-black/20 px-3 py-3">
+      <p className="text-[10px] font-medium uppercase tracking-widest text-zinc-500">{title}</p>
+      <p
+        className={
+          highlight
+            ? "mt-1.5 font-mono text-lg tabular-nums leading-none text-cyan-200 sm:text-[17px]"
+            : "mt-1.5 font-mono text-lg tabular-nums leading-none text-zinc-100 sm:text-[17px]"
+        }
+      >
+        {value}
+      </p>
     </div>
   );
 }
@@ -645,11 +706,11 @@ function MetricMini({
   value: string;
   tone?: "neutral" | "good";
 }) {
-  const cls = tone === "good" ? "text-emerald-200/90" : "text-zinc-100";
+  const cls = tone === "good" ? "text-emerald-200/95" : "text-zinc-100";
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-wide text-zinc-500">{title}</p>
-      <p className={`mt-0.5 font-mono text-sm ${cls}`}>{value}</p>
+      <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">{title}</p>
+      <p className={`mt-1 font-mono text-lg tabular-nums leading-snug ${cls}`}>{value}</p>
     </div>
   );
 }

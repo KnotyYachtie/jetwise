@@ -6,7 +6,7 @@ import { getEnrichedRoutes } from "@/lib/routes-data";
 export async function POST() {
   try {
     const company = await getCompany();
-    const routes = await getEnrichedRoutes();
+    const routes = (await getEnrichedRoutes()).filter((r) => r.status !== "suggested");
     for (const r of routes) {
       await persistRouteOptimization(r.id, r.optimized, r.comparison);
     }

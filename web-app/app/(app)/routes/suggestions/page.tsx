@@ -4,12 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { JwCard } from "@/components/JwCard";
 import { api } from "@/lib/api-client";
-import { usd } from "@/lib/format";
-
-type FleetRow = {
-  type: string;
-  config: { y: number; j: number; f: number };
-};
+import { usdAbbrev } from "@/lib/format";
 
 type SugRoute = {
   id: string;
@@ -21,18 +16,9 @@ type SugRoute = {
   demand: { y: number; j: number; f: number };
   optimized: {
     total_profit_per_week: number;
-    fleet_mix: FleetRow[];
     scheduling: { trips_per_week: number };
   };
 };
-
-function fleetMixLine(rows: FleetRow[]): string {
-  const m = new Map<string, number>();
-  for (const r of rows) {
-    m.set(r.type, (m.get(r.type) ?? 0) + 1);
-  }
-  return [...m.entries()].map(([t, n]) => `${n}× ${t}`).join(" · ") || "—";
-}
 
 export default function RouteSuggestionsPage() {
   const [routes, setRoutes] = useState<SugRoute[]>([]);
@@ -137,27 +123,31 @@ export default function RouteSuggestionsPage() {
           </p>
         </JwCard>
       ) : (
-        <JwCard title={`${routes.length} suggested OD pairs`} subtitle="Optimized economics · weekly">
+        <JwCard title={`${routes.length} ideas`} subtitle="Modeled profit / week · tap for economics">
           <ul className="divide-y divide-zinc-800">
             {routes.map((r) => (
               <li key={r.id}>
                 <Link
                   href={`/routes/${r.id}`}
-                  className="flex flex-col gap-2 py-4 transition hover:bg-white/[0.03] sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-1"
+                  className="-mx-1 flex min-h-[4.25rem] flex-col gap-1 rounded-xl px-3 py-4 transition active:bg-white/[0.06] sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:py-4 sm:hover:bg-white/[0.03]"
                 >
-                  <div className="min-w-0">
-                    <p className="font-mono text-base text-white">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-mono text-lg font-semibold tracking-tight text-white sm:text-base">
                       {r.origin} → {r.destination}
                     </p>
-                    <p className="mt-1 text-xs text-zinc-500">
-                      Hub {r.hub ?? "—"} · {Math.round(r.distance)} km · demand Y{r.demand.y} J{r.demand.j} F{r.demand.f}{" "}
-                      · trips/wk ~{r.optimized.scheduling.trips_per_week}
+                    <p className="mt-1 text-[13px] leading-snug text-zinc-500">
+                      {r.hub ?? "— hub"} · {Math.round(r.distance)} km · ~{r.optimized.scheduling.trips_per_week} trips/wk
+                      <span className="text-zinc-600"> · </span>
+                      <span className="text-zinc-400">
+                        Y{r.demand.y} J{r.demand.j} F{r.demand.f}
+                      </span>
                     </p>
-                    <p className="mt-1 text-xs text-cyan-200/80">{fleetMixLine(r.optimized.fleet_mix)}</p>
                   </div>
-                  <div className="shrink-0 text-left sm:text-right">
-                    <p className="text-[10px] uppercase tracking-widest text-zinc-500">Optimized / wk</p>
-                    <p className="font-mono text-lg text-emerald-400">{usd(r.optimized.total_profit_per_week)}</p>
+                  <div className="shrink-0 border-t border-zinc-800/80 pt-3 sm:border-t-0 sm:pt-0 sm:text-right">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Profit / wk</p>
+                    <p className="font-mono text-xl tabular-nums text-emerald-400 sm:text-lg">
+                      {usdAbbrev(r.optimized.total_profit_per_week)}
+                    </p>
                   </div>
                 </Link>
               </li>
