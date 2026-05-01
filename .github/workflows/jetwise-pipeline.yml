@@ -5,8 +5,8 @@
 #   POSTGRES_URL — same pooled Postgres URL as Vercel (Neon / Vercel Postgres).
 #
 # Provide ONE data secret depending on workflow mode:
-#   full             → JETWISE_PIPELINE_DATA_TAR_URL — HTTPS URL to .tar.gz whose entries include:
-#                       airports.parquet, long_airports.parquet, routes.parquet (paths may include a top-level folder)
+#   full             → JETWISE_PIPELINE_DATA_TAR_URL — HTTPS URL to .tar.gz that extracts so these exist:
+#                       ~/Downloads/airports.parquet, ~/Downloads/long_airports.parquet, ~/Downloads/routes.parquet
 #   directional-only → JETWISE_DIRECTIONAL_PARQUET_URL — final_routes_directional.parquet
 #   csv-only         → JETWISE_HUB_SEED_CSV_URL — hub_suggestions_seed.csv (no Python rebuild)
 #
