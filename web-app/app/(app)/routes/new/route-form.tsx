@@ -229,7 +229,7 @@ export default function RouteForm({ editId }: { editId?: string }) {
         </div>
       </JwCard>
 
-      <JwCard title="Demand" subtitle="Economy / business / first" className="relative z-0">
+      <JwCard title="Demand" subtitle="Y / J / F passengers per 24h" className="relative z-0">
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Y" value={demandY} onChange={setDemandY} inputMode="numeric" />
           <Field label="J" value={demandJ} onChange={setDemandJ} inputMode="numeric" />

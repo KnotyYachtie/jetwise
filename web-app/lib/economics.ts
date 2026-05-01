@@ -77,8 +77,41 @@ export function schedulingAnalysis(
 
 export type Config = { y: number; j: number; f: number };
 
+/** Weekly passenger volume from daily route O&D (7 identical days). */
+export function weeklyVolumeFromDaily(d: Demand): Demand {
+  return { y: d.y * 7, j: d.j * 7, f: d.f * 7 };
+}
+
+/**
+ * Caps for one departure: remaining daily O&D spread across this aircraft's weekly trip count.
+ * Demand inputs are per 24h; each flight repeats the same seat mix.
+ */
+export function perFlightDemandCapsFromDailyRemaining(
+  remainingDaily: Demand,
+  tripsPerWeek: number
+): Demand {
+  if (tripsPerWeek <= 0) return { y: 0, j: 0, f: 0 };
+  const w = weeklyVolumeFromDaily(remainingDaily);
+  return {
+    y: w.y / tripsPerWeek,
+    j: w.j / tripsPerWeek,
+    f: w.f / tripsPerWeek,
+  };
+}
+
+/** Passengers per day in each cabin for a repeating per-flight load. */
+export function dailyThroughputFromSchedule(config: Config, tripsPerWeek: number): Demand {
+  const perDay = tripsPerWeek / 7;
+  return {
+    y: config.y * perDay,
+    j: config.j * perDay,
+    f: config.f * perDay,
+  };
+}
+
 /**
  * Backbone §6 — greedy by revenue per capacity unit (Y/1, J/2, F/3).
+ * `demand` caps are per departure (may be fractional from daily O&D ÷ trips).
  */
 export function solveConfig(aircraft: Aircraft, demand: Demand, prices: TicketPrices): Config {
   const cap = aircraft.capacity;
@@ -99,7 +132,8 @@ export function solveConfig(aircraft: Aircraft, demand: Demand, prices: TicketPr
 
   for (const o of order) {
     const maxByCap = Math.floor((cap - used) / o.w);
-    const add = Math.max(0, Math.min(o.rem, maxByCap));
+    const raw = Math.min(o.rem, maxByCap);
+    const add = Math.max(0, Math.floor(raw));
     if (o.key === "f") f = add;
     if (o.key === "j") j = add;
     if (o.key === "y") y = add;
@@ -210,15 +244,23 @@ function buildFlightEconomics(
   };
 }
 
+/**
+ * Optimize cabin for one hull against **remaining daily** route O&D.
+ * Per-flight caps = (daily × 7) / trips_per_week for that aircraft.
+ */
 export function evaluateAircraftOnRoute(
   aircraft: Aircraft,
   company: Company,
   distance: number,
-  demand: Demand
+  remainingDailyDemand: Demand
 ): FlightEconomics | null {
   if (distance > aircraft.range_km) return null;
+  const ft = flightTimeHours(distance, aircraft, company);
+  const tpw = tripsPerWeek(ft);
+  if (tpw <= 0) return null;
   const prices = ticketPrices(distance);
-  const config = solveConfig(aircraft, demand, prices);
+  const perFlight = perFlightDemandCapsFromDailyRemaining(remainingDailyDemand, tpw);
+  const config = solveConfig(aircraft, perFlight, prices);
   return buildFlightEconomics(aircraft, company, distance, config, prices);
 }
 
@@ -234,10 +276,13 @@ export function evaluateWithFixedConfig(
   return buildFlightEconomics(aircraft, company, distance, config, prices);
 }
 
-export function demandFulfilledPercent(demand: Demand, served: { y: number; j: number; f: number }): number {
+/** `demand` and `servedDaily` are both per 24h (passengers/day by cabin). */
+export function demandFulfilledPercent(demand: Demand, servedDaily: { y: number; j: number; f: number }): number {
   const d = demand.y + demand.j + demand.f;
   if (d === 0) return 100;
   const s =
-    Math.min(served.y, demand.y) + Math.min(served.j, demand.j) + Math.min(served.f, demand.f);
+    Math.min(servedDaily.y, demand.y) +
+    Math.min(servedDaily.j, demand.j) +
+    Math.min(servedDaily.f, demand.f);
   return (s / d) * 100;
 }

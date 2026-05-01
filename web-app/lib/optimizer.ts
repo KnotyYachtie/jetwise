@@ -1,6 +1,7 @@
 import { A380_SPEC, A330_SPEC } from "./aircraft-data";
 import type { Aircraft, Company, FlightEconomics, SchedulingInfo } from "./economics";
 import {
+  dailyThroughputFromSchedule,
   demandFulfilledPercent,
   evaluateAircraftOnRoute,
   evaluateWithFixedConfig,
@@ -150,22 +151,19 @@ function evaluateComboCounts(
       return null;
     }
     planRows.push({ ac, fe });
+    const dt = dailyThroughputFromSchedule(fe.config, fe.trips_per_week);
     remaining = {
-      y: Math.max(0, remaining.y - fe.config.y),
-      j: Math.max(0, remaining.j - fe.config.j),
-      f: Math.max(0, remaining.f - fe.config.f),
+      y: Math.max(0, remaining.y - dt.y),
+      j: Math.max(0, remaining.j - dt.j),
+      f: Math.max(0, remaining.f - dt.f),
     };
   }
 
   const total = planRows.reduce((s, p) => s + p.fe.profit_per_week, 0);
-  const served = planRows.reduce(
-    (acc, p) => ({
-      y: acc.y + p.fe.config.y,
-      j: acc.j + p.fe.config.j,
-      f: acc.f + p.fe.config.f,
-    }),
-    { y: 0, j: 0, f: 0 }
-  );
+  const served = planRows.reduce((acc, p) => {
+    const d = dailyThroughputFromSchedule(p.fe.config, p.fe.trips_per_week);
+    return { y: acc.y + d.y, j: acc.j + d.j, f: acc.f + d.f };
+  }, { y: 0, j: 0, f: 0 });
   const fulfilled = demandFulfilledPercent(demand, served);
 
   return {
@@ -201,14 +199,10 @@ function evaluateComboCountsEqualSplit(
   }
 
   const total = planRows.reduce((s, p) => s + p.fe.profit_per_week, 0);
-  const served = planRows.reduce(
-    (acc, p) => ({
-      y: acc.y + p.fe.config.y,
-      j: acc.j + p.fe.config.j,
-      f: acc.f + p.fe.config.f,
-    }),
-    { y: 0, j: 0, f: 0 }
-  );
+  const served = planRows.reduce((acc, p) => {
+    const d = dailyThroughputFromSchedule(p.fe.config, p.fe.trips_per_week);
+    return { y: acc.y + d.y, j: acc.j + d.j, f: acc.f + d.f };
+  }, { y: 0, j: 0, f: 0 });
   const fulfilled = demandFulfilledPercent(demand, served);
 
   return {
@@ -349,21 +343,18 @@ export function evaluateCurrentAssignment(
     if (!fe) continue;
     total += fe.profit_per_week;
     plan.push(toRow(ac, fe));
+    const dt = dailyThroughputFromSchedule(fe.config, fe.trips_per_week);
     remaining = {
-      y: Math.max(0, remaining.y - fe.config.y),
-      j: Math.max(0, remaining.j - fe.config.j),
-      f: Math.max(0, remaining.f - fe.config.f),
+      y: Math.max(0, remaining.y - dt.y),
+      j: Math.max(0, remaining.j - dt.j),
+      f: Math.max(0, remaining.f - dt.f),
     };
   }
 
-  const served = plan.reduce(
-    (acc, p) => ({
-      y: acc.y + p.config.y,
-      j: acc.j + p.config.j,
-      f: acc.f + p.config.f,
-    }),
-    { y: 0, j: 0, f: 0 }
-  );
+  const served = plan.reduce((acc, p) => {
+    const d = dailyThroughputFromSchedule(p.config, p.trips_per_week);
+    return { y: acc.y + d.y, j: acc.j + d.j, f: acc.f + d.f };
+  }, { y: 0, j: 0, f: 0 });
   const fulfilled = demandFulfilledPercent(demand, served);
 
   return { total_profit_per_week: total, fulfilled, plan };

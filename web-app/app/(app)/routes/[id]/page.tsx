@@ -457,7 +457,7 @@ export default function RouteDetailPage() {
               <Stat title="Bracket (~daily eq)" value={String(opt.scheduling.trip_bracket)} />
             </div>
             <p className="mt-3 text-xs text-zinc-400">
-              Demand Y {r.demand.y} · J {r.demand.j} · F {r.demand.f} · Ticket Y {usd(r.prices.y)} · J {usd(r.prices.j)} · F {usd(r.prices.f)}
+              Demand (24h) Y {r.demand.y} · J {r.demand.j} · F {r.demand.f} · Ticket Y {usd(r.prices.y)} · J {usd(r.prices.j)} · F {usd(r.prices.f)}
             </p>
           </section>
 
