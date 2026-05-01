@@ -23,7 +23,9 @@ const GLOBE_BUMP_URL = "/globe/earth-topology.png";
  * Full-bleed 3D globe (three-globe + R3F).
  * - Earth texture + bump from `public/globe/` (three-globe example assets).
  * - Land admin boundaries from `public/globe/globe.json` (GeoJSON FeatureCollection).
- * - Route arcs use DB lat/lon via `arcs` (see `getRouteMapDots`).
+ * - Great-circle route lines use `pathsData` (not `arcsData`): three-globe
+ *   interpolates along the sphere between endpoints, and `pathTransitionDuration={0}`
+ *   avoids the default “draw in” animation that can read as broken segments.
  */
 export function JwGlobeBackdropInner({ arcs }: { arcs: RouteMapDot[] }) {
   const [landFeatures, setLandFeatures] = useState<GlobeLandFeature[]>([]);
@@ -41,7 +43,7 @@ export function JwGlobeBackdropInner({ arcs }: { arcs: RouteMapDot[] }) {
           setLandFeatures(d.features);
         })
         .catch(() => {
-          /* Land overlay is optional; globe still renders with texture + arcs. */
+          /* Land overlay is optional; globe still renders with texture + routes. */
         });
     });
     return () => {
@@ -49,13 +51,14 @@ export function JwGlobeBackdropInner({ arcs }: { arcs: RouteMapDot[] }) {
     };
   }, []);
 
-  const arcsData = useMemo(
+  /** Each leg: two surface points `[lat, lng]`; path layer subsamples the sphere (see `pathResolution`). */
+  const pathsData = useMemo(
     () =>
       arcs.map((d) => ({
-        startLat: d.start.lat,
-        startLng: d.start.lng,
-        endLat: d.end.lat,
-        endLng: d.end.lng,
+        points: [
+          [d.start.lat, d.start.lng],
+          [d.end.lat, d.end.lng],
+        ] as [number, number][],
         color: JW_TOKENS.globe.arc,
       })),
     [arcs]
@@ -82,13 +85,15 @@ export function JwGlobeBackdropInner({ arcs }: { arcs: RouteMapDot[] }) {
         polygonCapColor={() => JW_TOKENS.globe.landCap}
         polygonSideColor={() => JW_TOKENS.globe.landSide}
         polygonStrokeColor={() => JW_TOKENS.globe.landStroke}
-        arcsData={arcsData}
-        arcStroke={0.38}
-        arcCurveResolution={96}
-        arcAltitude={0.08}
-        arcDashLength={1}
-        arcDashGap={0}
-        arcDashAnimateTime={0}
+        pathsData={pathsData}
+        pathPoints="points"
+        pathColor="color"
+        pathStroke={0.42}
+        pathResolution={1.25}
+        pathDashLength={1}
+        pathDashGap={0}
+        pathDashAnimateTime={0}
+        pathTransitionDuration={0}
         atmosphereColor={JW_TOKENS.accent}
         atmosphereAltitude={JW_TOKENS.globe.atmosphereAltitude}
         showAtmosphere
