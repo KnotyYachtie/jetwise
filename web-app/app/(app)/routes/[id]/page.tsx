@@ -135,13 +135,6 @@ function weightedTripEconomics(rows: FleetEconomicsRow[]) {
   };
 }
 
-/** Builds a short text like "A380×2 · A330×1" from the optimized fleet rows. */
-function fleetTypeSummary(rows: FleetEconomicsRow[]): string {
-  const m = new Map<string, number>();
-  for (const r of rows) m.set(r.type, (m.get(r.type) ?? 0) + 1);
-  return [...m.entries()].map(([t, n]) => `${t}×${n}`).join(" · ") || "—";
-}
-
 /** Human-friendly aircraft variant for titles (e.g. card headings). */
 function aircraftVariantLabel(type: string): string {
   if (type === "A380") return "A380-800";
@@ -154,6 +147,31 @@ function aircraftFullName(type: string): string {
   if (type === "A380") return "Airbus A380-800";
   if (type === "A330") return "Airbus A330-800";
   return type;
+}
+
+/**
+ * Full product name for the one-line “Optimized mix” summary (not card subtitles).
+ * A330 uses the NEO designation here per product naming.
+ */
+function aircraftOptimizedMixSummaryName(type: string): string {
+  if (type === "A380") return "Airbus A380-800";
+  if (type === "A330") return "Airbus A330-800NEO";
+  return type;
+}
+
+/**
+ * One-line optimized fleet description, e.g. "5 x Airbus A380-800" or
+ * "5 x Airbus A380-800 + 1 x Airbus A330-800NEO". Counts rows in fleet_mix by type.
+ */
+function optimizedMixLineSummary(rows: FleetEconomicsRow[]): string {
+  if (!rows.length) return "—";
+  const m = new Map<string, number>();
+  for (const r of rows) m.set(r.type, (m.get(r.type) ?? 0) + 1);
+  const typeRank = (t: string) => (t === "A380" ? 0 : t === "A330" ? 1 : 99);
+  const types = [...m.keys()].sort((a, b) => typeRank(a) - typeRank(b) || a.localeCompare(b));
+  return types
+    .map((t) => `${m.get(t)} x ${aircraftOptimizedMixSummaryName(t)}`)
+    .join(" + ");
 }
 
 /** Formats money per hour; large values show as $X.Xk / hr for readability. */
@@ -475,7 +493,8 @@ export default function RouteDetailPage() {
           <section className="border-t border-zinc-800/80 pt-5">
             <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Optimized mix</p>
             <p className="mt-1 text-xs text-zinc-400">
-              {fleetTypeSummary(optimizedRows)} </p>
+              {optimizedMixLineSummary(optimizedRows)} · Deploy cap {MAX_AIRCRAFT_PER_ROUTE} · Marginal A330 {usd(opt.marginal_a330_value)} · A380 {usd(opt.marginal_a380_value)}
+            </p>
             <ul className="mt-3 grid grid-cols-2 gap-2 text-sm">
               {/* Same pattern as current lines, but data comes from the solver’s fleet_mix */}
               {opt.fleet_mix.length ? (
