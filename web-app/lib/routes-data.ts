@@ -1,5 +1,5 @@
 import { sql } from "@vercel/postgres";
-import { resolveAirportDisplayNamesBatch } from "./airport-display-names";
+import { resolveAirportMetaBatch } from "./airport-display-names";
 import { getCompany } from "./company";
 import {
   enrichRoute,
@@ -17,13 +17,15 @@ export async function getEnrichedRoutes(optimizerOptions?: OptimizerOptions): Pr
     const asg = aRes.rows.filter((a) => (a as { route_id?: string }).route_id === r.id) as AssignmentRow[];
     return enrichRoute(r as DbRoute, asg, company, optimizerOptions);
   });
-  const nameMap = await resolveAirportDisplayNamesBatch(
+  const airportMeta = await resolveAirportMetaBatch(
     enriched.map((r) => ({ origin: r.origin, destination: r.destination }))
   );
   return enriched.map((r) => ({
     ...r,
-    origin_airport_name: nameMap.get(r.origin.toUpperCase()) ?? null,
-    destination_airport_name: nameMap.get(r.destination.toUpperCase()) ?? null,
+    origin_airport_name: airportMeta.get(r.origin.toUpperCase())?.name ?? null,
+    destination_airport_name: airportMeta.get(r.destination.toUpperCase())?.name ?? null,
+    origin_airport: airportMeta.get(r.origin.toUpperCase()) ?? null,
+    destination_airport: airportMeta.get(r.destination.toUpperCase()) ?? null,
   }));
 }
 
@@ -36,12 +38,14 @@ export async function getEnrichedRouteById(
   if (r.rows.length === 0) return null;
   const a = await sql`SELECT * FROM route_assignments WHERE route_id = ${id} ORDER BY position ASC`;
   const base = enrichRoute(r.rows[0] as DbRoute, a.rows as AssignmentRow[], company, optimizerOptions);
-  const nameMap = await resolveAirportDisplayNamesBatch([
+  const airportMeta = await resolveAirportMetaBatch([
     { origin: base.origin, destination: base.destination },
   ]);
   return {
     ...base,
-    origin_airport_name: nameMap.get(base.origin.toUpperCase()) ?? null,
-    destination_airport_name: nameMap.get(base.destination.toUpperCase()) ?? null,
+    origin_airport_name: airportMeta.get(base.origin.toUpperCase())?.name ?? null,
+    destination_airport_name: airportMeta.get(base.destination.toUpperCase())?.name ?? null,
+    origin_airport: airportMeta.get(base.origin.toUpperCase()) ?? null,
+    destination_airport: airportMeta.get(base.destination.toUpperCase()) ?? null,
   };
 }

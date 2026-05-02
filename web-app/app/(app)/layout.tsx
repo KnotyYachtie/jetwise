@@ -11,7 +11,7 @@ export default async function AppShellLayout({ children }: { children: React.Rea
     <div className="jw-app-shell flex min-h-screen flex-col">
       <JwGlobeBackdrop dots={dots} />
       <JwNavHeader />
-      <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 pb-[calc(5.25rem+env(safe-area-inset-bottom))] pt-8 md:pb-8">
+      <main className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 pb-[calc(7.25rem+env(safe-area-inset-bottom))] pt-8 md:pb-8">
         {children}
       </main>
       <JwMobileBottomNav />

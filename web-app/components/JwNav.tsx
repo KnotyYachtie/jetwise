@@ -1,86 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
+import { Building2, House, LogOut, Route as RouteIcon, Settings2, Sparkles } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
-const items: { href: string; label: string; mobileLabel: string }[] = [
-  { href: "/", label: "Fleet", mobileLabel: "Fleet" },
-  { href: "/routes", label: "Routes", mobileLabel: "Routes" },
-  { href: "/routes/suggestions", label: "Suggestions", mobileLabel: "Ideas" },
-  { href: "/hubs", label: "Hubs", mobileLabel: "Hubs" },
-  { href: "/settings", label: "Markets", mobileLabel: "Mkts" },
+const items = [
+  { href: "/", label: "Home", icon: House },
+  { href: "/routes", label: "Routes", icon: RouteIcon },
+  { href: "/routes/suggestions", label: "Ideas", icon: Sparkles },
+  { href: "/hubs", label: "Hubs", icon: Building2 },
+  { href: "/settings", label: "Settings", icon: Settings2 },
 ];
 
 function pill(href: string, current: string) {
   if (href === "/") return current === "/";
-  if (href === "/routes") return current === "/routes";
+  if (href === "/routes/suggestions") return current === href || current.startsWith(`${href}/`);
+  if (href === "/routes") {
+    return (current === href || current.startsWith("/routes/")) && !current.startsWith("/routes/suggestions");
+  }
   return current === href || current.startsWith(`${href}/`);
 }
-
-function IconFleet({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
-    </svg>
-  );
-}
-
-function IconRoutes({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} aria-hidden>
-      <path d="M3 18h18M5 18l4-9 4 3 4-6 4 12" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="9" cy="9" r="1.5" fill="currentColor" stroke="none" />
-      <circle cx="17" cy="6" r="1.5" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-function IconHubs({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} aria-hidden>
-      <path d="M4 20V10l4-2v12M10 20V6l4-2v16M16 20v-8l4-2v10" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M2 20h20" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IconMarkets({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} aria-hidden>
-      <path d="M12 3v18M3 12h18" strokeLinecap="round" />
-      <circle cx="12" cy="12" r="8" strokeDasharray="4 3" />
-    </svg>
-  );
-}
-
-function IconLogout({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} aria-hidden>
-      <path d="M10 17H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4M14 7l5 5-5 5M19 12H9" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function IconSuggestions({ className }: { className?: string }) {
-  return <Sparkles className={className} aria-hidden strokeWidth={1.75} />;
-}
-
-const mobileIcons = [IconFleet, IconRoutes, IconSuggestions, IconHubs, IconMarkets] as const;
 
 function linkClass(on: boolean) {
   return on
     ? "rounded-lg bg-cyan-500/15 px-3 py-1.5 text-sm text-cyan-200 ring-1 ring-cyan-500/40"
     : "rounded-lg px-3 py-1.5 text-sm text-zinc-400 hover:text-cyan-200";
-}
-
-function bottomItemClass(on: boolean) {
-  return [
-    "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-2 text-[10px] font-medium leading-tight transition-colors",
-    on
-      ? "text-cyan-200 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.35)] bg-cyan-500/10"
-      : "text-zinc-500 active:bg-white/5",
-  ].join(" ");
 }
 
 export function JwNavHeader() {
@@ -125,7 +69,10 @@ export function JwNavHeader() {
             onClick={() => void logout()}
             className="ml-2 rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-400 hover:border-cyan-500/50 hover:text-cyan-200"
           >
-            Logout
+            <span className="inline-flex items-center gap-2">
+              <LogOut className="h-4 w-4" aria-hidden strokeWidth={1.8} />
+              Logout
+            </span>
           </button>
         </nav>
       </div>
@@ -135,34 +82,41 @@ export function JwNavHeader() {
 
 export function JwMobileBottomNav() {
   const pathname = usePathname() || "/";
-  const router = useRouter();
-
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-    router.push("/login");
-    router.refresh();
-  }
 
   return (
     <nav
       aria-label="Mobile navigation"
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-cyan-500/30 bg-black/70 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_-18px_rgba(34,211,238,0.22),inset_0_1px_0_0_rgba(251,146,60,0.08)] backdrop-blur-xl md:hidden"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 px-3 pb-[max(0.875rem,env(safe-area-inset-bottom))] md:hidden"
     >
-      <div className="mx-auto flex max-w-6xl items-end justify-between gap-0.5 px-1 pt-1">
-        {items.map((it, i) => {
-          const on = pill(it.href, pathname);
-          const Icon = mobileIcons[i];
-          return (
-            <Link key={it.href} href={it.href} className={bottomItemClass(on)}>
-              <Icon className="h-5 w-5 shrink-0" />
-              <span className="max-w-full truncate">{it.mobileLabel}</span>
-            </Link>
-          );
-        })}
-        <button type="button" onClick={() => void logout()} className={bottomItemClass(false)}>
-          <IconLogout className="h-5 w-5 shrink-0 text-zinc-400" />
-          <span className="max-w-full truncate text-zinc-400">Logout</span>
-        </button>
+      <div className="pointer-events-auto mx-auto max-w-md rounded-[30px] border border-white/10 bg-black/65 shadow-[0_16px_50px_-24px_rgba(0,0,0,0.85),0_0_0_1px_rgba(34,211,238,0.08),inset_0_1px_0_0_rgba(255,255,255,0.05)] backdrop-blur-2xl">
+        <div className="grid grid-cols-5 items-end gap-1 px-3 pb-3 pt-2">
+          {items.map((it) => {
+            const on = pill(it.href, pathname);
+            const Icon = it.icon;
+            return (
+              <Link key={it.href} href={it.href} className="flex min-w-0 flex-col items-center justify-end gap-1 pb-0.5">
+                <span
+                  className={
+                    on
+                      ? "mb-0.5 flex h-14 w-14 -translate-y-3 items-center justify-center rounded-full border border-cyan-300/30 bg-[radial-gradient(circle_at_50%_35%,rgba(54,238,246,0.32),rgba(10,37,49,0.96)_72%)] text-cyan-50 shadow-[0_14px_30px_-14px_rgba(34,211,238,0.92),0_0_28px_-14px_rgba(34,211,238,0.85)]"
+                      : "flex h-10 w-10 items-center justify-center rounded-full text-zinc-500"
+                  }
+                >
+                  <Icon className={on ? "h-5 w-5" : "h-5 w-5 opacity-80"} aria-hidden strokeWidth={1.9} />
+                </span>
+                <span
+                  className={
+                    on
+                      ? "max-w-full truncate text-[11px] font-medium text-cyan-100"
+                      : "max-w-full truncate text-[11px] font-medium text-zinc-500"
+                  }
+                >
+                  {it.label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );

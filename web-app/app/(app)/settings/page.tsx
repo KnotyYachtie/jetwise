@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { JwCard } from "@/components/JwCard";
 import { api } from "@/lib/api-client";
 
@@ -15,6 +16,7 @@ type Company = {
 };
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [draft, setDraft] = useState<Company | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -44,9 +46,15 @@ export default function SettingsPage() {
     }
   }
 
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    router.push("/login");
+    router.refresh();
+  }
+
   if (!draft) {
     return err ? (
-      <JwCard title="Markets" subtitle="Error">
+      <JwCard title="Settings" subtitle="Error">
         <p className="text-sm text-orange-400">{err}</p>
       </JwCard>
     ) : (
@@ -75,8 +83,8 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold text-white">Markets &amp; training</h1>
-        <p className="mt-1 text-sm text-zinc-500">Backbone inputs — drives burn, speed, and cost multipliers.</p>
+        <h1 className="text-3xl font-semibold text-white">Settings</h1>
+        <p className="mt-1 text-sm text-zinc-500">Markets, training inputs, and account actions for your sim profile.</p>
       </div>
       {err ? <p className="text-sm text-orange-400">{err}</p> : null}
       <JwCard title="Company state" subtitle="REALISM defaults; update to match your sim">
@@ -97,14 +105,23 @@ export default function SettingsPage() {
             </label>
           ))}
         </div>
-        <button
-          type="button"
-          disabled={saving}
-          onClick={() => void save()}
-          className="mt-6 rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-bold uppercase tracking-widest text-cyan-100 disabled:opacity-40"
-        >
-          {saving ? "…" : "Save"}
-        </button>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => void save()}
+            className="rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-bold uppercase tracking-widest text-cyan-100 disabled:opacity-40"
+          >
+            {saving ? "…" : "Save"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void logout()}
+            className="rounded-xl border border-zinc-700 bg-black/20 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-zinc-500 hover:text-white"
+          >
+            Log out
+          </button>
+        </div>
       </JwCard>
     </div>
   );

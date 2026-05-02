@@ -9,6 +9,13 @@ import {
 import type { CurrentAircraftRow, Demand } from "./types";
 import type { SchedulingInfo } from "./economics";
 
+export type RouteAirportMeta = {
+  icao: string;
+  name: string | null;
+  city: string | null;
+  countryIso2: string | null;
+};
+
 export type DbRoute = {
   id: string;
   origin: string;
@@ -41,6 +48,8 @@ export type RoutePayload = DbRoute & {
   /** Hub name or airport_lookup.name when available */
   origin_airport_name?: string | null;
   destination_airport_name?: string | null;
+  origin_airport?: RouteAirportMeta | null;
+  destination_airport?: RouteAirportMeta | null;
   demand: Demand;
   prices: TicketPrices;
   current: {
