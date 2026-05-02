@@ -9,12 +9,20 @@ import { getEnrichedRouteById, getEnrichedRoutes } from "@/lib/routes-data";
 export async function GET(req: NextRequest) {
   try {
     const status = req.nextUrl.searchParams.get("status")?.trim();
+    const hubParam = req.nextUrl.searchParams.get("hub")?.trim();
     const optimizerOptions = optionsFromSearchParams(req.nextUrl.searchParams);
     let routes = await getEnrichedRoutes(optimizerOptions);
     if (status) {
       routes = routes.filter((r) => r.status === status);
     } else {
       routes = routes.filter((r) => r.status !== "suggested");
+    }
+    if (hubParam) {
+      if (!isValidHub(hubParam)) {
+        return NextResponse.json({ error: "Invalid hub ICAO" }, { status: 400 });
+      }
+      const hubIcao = hubParam.toUpperCase();
+      routes = routes.filter((r) => r.hub === hubIcao);
     }
     return NextResponse.json({ routes });
   } catch (err) {

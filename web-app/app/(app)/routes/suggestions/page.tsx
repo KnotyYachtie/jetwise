@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { JwCard } from "@/components/JwCard";
 import { api } from "@/lib/api-client";
 import { usdAbbrev } from "@/lib/format";
+import { HUBS } from "@/lib/hubs";
 import { optionsToQuery } from "@/lib/optimizer-options";
 
 type SugRoute = {
@@ -32,6 +33,7 @@ export default function RouteSuggestionsPage() {
   const [allowA330, setAllowA330] = useState(true);
   const [allowA350, setAllowA350] = useState(true);
   const [hullPenalty, setHullPenalty] = useState("0");
+  const [hubFilter, setHubFilter] = useState("");
 
   const optimizerQuery = optionsToQuery({
     allow_a380: allowA380,
@@ -44,7 +46,8 @@ export default function RouteSuggestionsPage() {
     setListLoading(true);
     setErr(null);
     try {
-      const j = await api<{ routes: SugRoute[] }>(`/api/routes?status=suggested&${optimizerQuery}`);
+      const hubQs = hubFilter ? `&hub=${encodeURIComponent(hubFilter)}` : "";
+      const j = await api<{ routes: SugRoute[] }>(`/api/routes?status=suggested&${optimizerQuery}${hubQs}`);
       const sorted = [...j.routes].sort(
         (a, b) => b.optimized.total_profit_per_week - a.optimized.total_profit_per_week
       );
@@ -55,7 +58,7 @@ export default function RouteSuggestionsPage() {
     } finally {
       setListLoading(false);
     }
-  }, [optimizerQuery]);
+  }, [optimizerQuery, hubFilter]);
 
   useEffect(() => {
     queueMicrotask(() => void load());
@@ -139,6 +142,21 @@ export default function RouteSuggestionsPage() {
               Subtracts a fixed weekly amount per deployed hull to favor simpler mixes.
             </span>
           </label>
+          <label className="flex w-full max-w-md flex-col gap-1 text-sm">
+            <span className="text-[11px] uppercase tracking-wider text-zinc-500">Hub</span>
+            <select
+              value={hubFilter}
+              onChange={(e) => setHubFilter(e.target.value)}
+              className="w-full rounded-lg border border-zinc-800 bg-black/40 px-3 py-2 text-sm text-white"
+            >
+              <option value="">All hubs</option>
+              {HUBS.map((h) => (
+                <option key={h.icao} value={h.icao}>
+                  {h.icao} — {h.city}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </JwCard>
 
@@ -180,11 +198,24 @@ export default function RouteSuggestionsPage() {
           </div>
         </div>
       ) : routes.length === 0 ? (
-        <JwCard title="No suggestions yet" subtitle="Import pipeline">
+        <JwCard
+          title={hubFilter ? "No ideas for this hub" : "No suggestions yet"}
+          subtitle={hubFilter ? "Try another hub or clear the filter" : "Import pipeline"}
+        >
           <p className="max-w-prose text-sm leading-relaxed text-zinc-500">
-            Click <strong className="text-zinc-400">Generate suggestions</strong> (runs{" "}
-            <code className="text-zinc-400">run_pipeline.sh</code>: Parquet rebuild → hub CSV → ranked DB insert), or run{" "}
-            <code className="text-zinc-400">npm run pipeline</code> from <code className="text-zinc-400">web-app/</code>.
+            {hubFilter ? (
+              <>
+                No suggested routes are assigned to hub{" "}
+                <span className="font-mono text-zinc-400">{hubFilter}</span> with the current optimizer settings.
+              </>
+            ) : (
+              <>
+                Click <strong className="text-zinc-400">Generate suggestions</strong> (runs{" "}
+                <code className="text-zinc-400">run_pipeline.sh</code>: Parquet rebuild → hub CSV → ranked DB insert),
+                or run <code className="text-zinc-400">npm run pipeline</code> from{" "}
+                <code className="text-zinc-400">web-app/</code>.
+              </>
+            )}
           </p>
         </JwCard>
       ) : (
